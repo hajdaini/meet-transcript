@@ -2,6 +2,8 @@ import os
 import sys
 from pathlib import Path
 
+from src.resources import app_root
+
 
 class ProgressTqdm:
     def __init__(self, *args, progress_callback=None, **kwargs):
@@ -86,7 +88,6 @@ class FasterWhisperProvider:
         settings = settings or {}
         self.configure_dll_paths()
         from faster_whisper import WhisperModel
-
         self.model_name = model_name or settings.get("model") or os.getenv("MEET_TRANSCRIPT_MODEL", "medium")
         self.device = settings.get("device") or os.getenv("MEET_TRANSCRIPT_DEVICE", "cuda")
         self.compute_type = settings.get("compute_type") or os.getenv("MEET_TRANSCRIPT_COMPUTE_TYPE", "int8_float16")
@@ -106,7 +107,7 @@ class FasterWhisperProvider:
     def configure_dll_paths(self):
         if sys.platform != "win32":
             return
-        root = Path(__file__).resolve().parents[2]
+        root = app_root()
         candidates = [root / "gpu-libs"]
         cuda_path = os.getenv("CUDA_PATH")
         if cuda_path:
@@ -255,7 +256,7 @@ class TranscriptionService:
 
     def gpu_library_paths(self):
         paths = []
-        root = Path(__file__).resolve().parents[2]
+        root = app_root()
         paths.append(root / "gpu-libs")
         cuda_path = os.getenv("CUDA_PATH")
         if cuda_path:

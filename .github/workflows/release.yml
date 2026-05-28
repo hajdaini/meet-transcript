@@ -1,0 +1,59 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    name: Build Windows executable
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install pyinstaller
+
+      - name: Build executable
+        shell: pwsh
+        run: |
+          pyinstaller --noconfirm --clean --windowed --name MeetTranscript --add-data "assets;assets" --collect-all faster_whisper --collect-all ctranslate2 --collect-all tokenizers --collect-all av main.py
+
+      - name: Package release
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}"
+          if ($version -eq "") { $version = "manual" }
+          $archive = "MeetTranscript-Windows-$version.zip"
+          $latest = "MeetTranscript-Windows-latest.zip"
+          Compress-Archive -Path "dist\MeetTranscript\*" -DestinationPath $archive -Force
+          Copy-Item -Path $archive -Destination $latest -Force
+          "archive=$archive" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "latest=$latest" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+        id: package
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ${{ steps.package.outputs.archive }}
+            ${{ steps.package.outputs.latest }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

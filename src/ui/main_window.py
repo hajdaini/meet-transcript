@@ -33,6 +33,7 @@ from PySide6.QtWidgets import (
 )
 
 from src.services.audio import AudioRecorder
+from src.resources import asset_path
 from src.services.storage import StorageService
 from src.services.transcription import TranscriptionService
 from src.ui.waveform import WaveformWidget
@@ -46,7 +47,7 @@ class Badge(QWidget):
         layout.setContentsMargins(8, 5, 9, 5)
         layout.setSpacing(6)
         self.icon = QLabel()
-        self.icon.setPixmap(QIcon(str(Path(__file__).resolve().parents[2] / "assets" / icon_name)).pixmap(14, 14))
+        self.icon.setPixmap(QIcon(str(asset_path(icon_name))).pixmap(14, 14))
         self.icon.setObjectName("badgeIcon")
         self.label = QLabel(text)
         self.label.setObjectName("badgeText")
@@ -101,7 +102,7 @@ class MainWindow(QMainWindow):
         self.is_compact = False
         self.transcription_running = False
         self.setWindowTitle("Meet Transcript")
-        self.setWindowIcon(QIcon(str(Path(__file__).resolve().parents[2] / "assets" / "app-icon.svg")))
+        self.setWindowIcon(QIcon(str(asset_path("app-icon.svg"))))
         self.setMinimumSize(760, 620)
         self.build_ui()
         self.apply_style()
@@ -124,7 +125,7 @@ class MainWindow(QMainWindow):
         side.setContentsMargins(10, 14, 10, 14)
         side.setSpacing(10)
         brand = QLabel()
-        brand.setPixmap(QIcon(str(Path(__file__).resolve().parents[2] / "assets" / "app-icon.svg")).pixmap(22, 22))
+        brand.setPixmap(QIcon(str(asset_path("app-icon.svg"))).pixmap(22, 22))
         brand.setAlignment(Qt.AlignCenter)
         brand.setObjectName("brandIcon")
         self.record_nav = self.nav_button("mic.svg", "Enregistrement", 0)
@@ -144,7 +145,7 @@ class MainWindow(QMainWindow):
 
     def nav_button(self, icon_name, tooltip, index):
         button = QToolButton()
-        button.setIcon(QIcon(str(Path(__file__).resolve().parents[2] / "assets" / icon_name)))
+        button.setIcon(QIcon(str(asset_path(icon_name))))
         button.setIconSize(QSize(18, 18))
         button.setToolTip(tooltip)
         button.setObjectName("navButton")
@@ -374,7 +375,7 @@ class MainWindow(QMainWindow):
         if icon_name:
             icon = QLabel()
             icon.setObjectName("sectionIcon")
-            icon.setPixmap(QIcon(str(Path(__file__).resolve().parents[2] / "assets" / icon_name)).pixmap(16, 16))
+            icon.setPixmap(QIcon(str(asset_path(icon_name))).pixmap(16, 16))
             header_layout.addWidget(icon, 0, Qt.AlignVCenter)
         label = QLabel(title)
         label.setObjectName("sectionTitle")
@@ -523,7 +524,7 @@ class MainWindow(QMainWindow):
 
     def svg_icon_button(self, name, tooltip):
         button = QToolButton()
-        button.setIcon(QIcon(str(Path(__file__).resolve().parents[2] / "assets" / name)))
+        button.setIcon(QIcon(str(asset_path(name))))
         button.setIconSize(QSize(15, 15))
         button.setToolTip(tooltip)
         button.setObjectName("iconButton")
@@ -533,7 +534,7 @@ class MainWindow(QMainWindow):
         return button
 
     def set_button_icon(self, button, name):
-        button.setIcon(QIcon(str(Path(__file__).resolve().parents[2] / "assets" / name)))
+        button.setIcon(QIcon(str(asset_path(name))))
 
     def load_settings_to_ui(self):
         self.set_combo(self.model_combo, self.settings.get("model", "medium"))
@@ -837,11 +838,11 @@ class MainWindow(QMainWindow):
         meta_layout.setContentsMargins(5, 0, 0, 0)
         meta_layout.setSpacing(5)
         calendar_icon = QLabel()
-        calendar_icon.setPixmap(QIcon(str(Path(__file__).resolve().parents[2] / "assets" / "calendar.svg")).pixmap(12, 12))
+        calendar_icon.setPixmap(QIcon(str(asset_path("calendar.svg"))).pixmap(12, 12))
         date_label = QLabel(date_text)
         date_label.setObjectName("sessionMetaText")
         clock_icon = QLabel()
-        clock_icon.setPixmap(QIcon(str(Path(__file__).resolve().parents[2] / "assets" / "clock.svg")).pixmap(12, 12))
+        clock_icon.setPixmap(QIcon(str(asset_path("clock.svg"))).pixmap(12, 12))
         duration_label = QLabel(duration)
         duration_label.setObjectName("sessionMetaText")
         meta_layout.addWidget(calendar_icon, 0, Qt.AlignVCenter)

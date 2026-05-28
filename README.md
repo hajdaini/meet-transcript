@@ -47,6 +47,36 @@ Run the app:
 
 `run.ps1` prepares CUDA/cuDNN DLL paths and starts the app. Model, device, language, microphone, gain, and output settings are managed directly inside the UI.
 
+## Windows Release
+
+The repository includes a GitHub Actions workflow at `.github/workflows/release.yml`.
+
+Download the latest Windows executable:
+
+[Download Meet Transcript for Windows](https://github.com/hajdaini/meet-transcript/releases/latest/download/MeetTranscript-Windows-latest.zip)
+
+Create and push a version tag to publish a GitHub release:
+
+```powershell
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+The workflow builds the Windows app with PyInstaller and uploads:
+
+```text
+MeetTranscript-Windows-v1.0.0.zip
+MeetTranscript-Windows-latest.zip
+```
+
+Inside the archive, launch:
+
+```text
+MeetTranscript.exe
+```
+
+The release is published automatically on GitHub with generated release notes.
+
 ## Default Settings
 
 ```text
