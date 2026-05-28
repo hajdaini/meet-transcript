@@ -1,4 +1,5 @@
 import json
+import re
 from datetime import datetime
 from pathlib import Path
 from uuid import uuid4
@@ -39,7 +40,7 @@ class StorageService:
 
     def save_session(self, session_id, audio_path, transcript, duration_seconds, language):
         transcript_path = self.text_dir / f"{session_id}.txt"
-        title = datetime.now().strftime("Session %d/%m/%Y %H:%M")
+        title = self.next_session_title()
         transcript_path.write_text(transcript, encoding="utf-8")
         session = Session(
             id=session_id,
@@ -55,6 +56,14 @@ class StorageService:
         items.insert(0, self.to_dict(session))
         self.history_path.write_text(json.dumps(items, indent=2, ensure_ascii=False), encoding="utf-8")
         return session
+
+    def next_session_title(self):
+        highest = 0
+        for item in self.load_raw():
+            match = re.fullmatch(r"Session (\d+)", item.get("title", ""))
+            if match:
+                highest = max(highest, int(match.group(1)))
+        return f"Session {highest + 1}"
 
     def load_sessions(self):
         sessions = []
@@ -91,6 +100,7 @@ class StorageService:
             "languages": ["auto"],
             "progress_chunk_seconds": 5,
             "microphone": "",
+            "mic_gain": 1.8,
             "system_output": "",
             "output_dir": str(self.base_dir),
         }

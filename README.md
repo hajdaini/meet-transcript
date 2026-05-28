@@ -1,27 +1,31 @@
 # Meet Transcript
 
-Meet Transcript is a Windows desktop app built with Python and PySide6. It records microphone audio and Windows system audio, then generates meeting transcripts with faster-whisper.
+Meet Transcript is a Windows desktop app built with Python and PySide6. It records microphone audio and Windows system audio, then generates local meeting transcripts with faster-whisper.
 
-## Features
+![Meet Transcript screenshot](docs/app-screenshot.png)
 
-- Dark PySide6 desktop UI
-- Start/Stop recording
-- Microphone detection and selection
-- Windows system audio capture with WASAPI loopback
-- Recent sessions list
-- Transcript preview
-- Copy transcript button
-- Rename and delete sessions
+## Current Features
+
+- Modern dark PySide6 interface
+- Microphone and Windows system audio recording
+- WASAPI loopback capture for meeting audio
+- Start/Stop recording workflow
+- Live waveform based on microphone and system audio levels
+- Local faster-whisper transcription
+- GPU or CPU transcription mode
+- GPU readiness check from the app
+- Whisper model selection: `small`, `medium`, `large-v3`
+- Whisper language mode with `Auto` by default
+- Real transcription progress from faster-whisper internal progress
+- Recent sessions list with compact metadata
+- Default session names: `Session 1`, `Session 2`, `Session 3`
+- Session actions: play audio, rename, delete
+- Transcript preview with copy action
 - Automatic settings save
-- CPU/GPU selection from the app
-- GPU status check with green/red popup
-- Transcription progress bar
-- Whisper model selection
-- Whisper language selection with Auto mode
-- Output folder selection
+- Configurable output folder
+- Microphone gain calibration, default `1.8x`
 
-
-## Setup
+## Quick Start
 
 Create the local virtual environment:
 
@@ -29,7 +33,7 @@ Create the local virtual environment:
 python -m venv .venv
 ```
 
-Install dependencies inside the local environment:
+Install dependencies inside the project environment:
 
 ```powershell
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
@@ -41,7 +45,7 @@ Run the app:
 .\run.ps1
 ```
 
-`run.ps1` only prepares CUDA/cuDNN DLL paths and starts the app. Model, CPU/GPU, language, microphone, and output settings are managed inside the UI.
+`run.ps1` prepares CUDA/cuDNN DLL paths and starts the app. Model, device, language, microphone, gain, and output settings are managed directly inside the UI.
 
 ## Default Settings
 
@@ -50,20 +54,23 @@ model: medium
 device: GPU
 compute type: int8_float16
 languages: Auto
+microphone: Auto
+microphone gain: 1.8x
+system output: Auto
 output directory: transcripts/
 ```
 
-The settings are saved automatically when changed in the app.
+Settings are saved automatically in `settings.json`.
 
-## GPU Requirements
+## GPU Setup
 
-GPU transcription uses `faster-whisper`, which uses CTranslate2. On Windows, the current GPU setup needs:
+GPU transcription uses `faster-whisper` through CTranslate2. On Windows, the app expects:
 
 - NVIDIA driver
 - CUDA Toolkit 12.x
 - cuDNN 9 for CUDA 12
 
-Recommended paths:
+Recommended installed paths:
 
 ```text
 C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.8
@@ -75,7 +82,7 @@ Download pages:
 - CUDA Toolkit archive: https://developer.nvidia.com/cuda-toolkit-archive
 - cuDNN downloads: https://developer.nvidia.com/cudnn-downloads
 
-The app scans:
+The app scans these locations:
 
 ```text
 gpu-libs/
@@ -90,16 +97,32 @@ cublas64_12.dll
 cudnn_ops64_9.dll
 ```
 
-If GPU is selected, the Settings screen has a `Verifier GPU` button. It shows a green popup when GPU is ready and a red popup with the missing dependency when it is not ready.
+Use `Settings > Verify GPU` to check the runtime. The app shows a green popup when GPU is ready, or a red popup with the missing dependency.
+
+## Storage
+
+Generated files are stored under the selected output folder:
+
+```text
+transcripts/
+  audio/
+    Session audio files as .wav
+  text/
+    Transcript files as .txt
+  history.json
+```
+
+The app stores session metadata in `history.json`. Deleting a session from the app also removes its audio and transcript files.
 
 ## Runtime Notes
 
 - The first Whisper run downloads the selected model to the Hugging Face cache.
 - The Hugging Face symlink warning on Windows is not blocking; it only means the cache may use more disk space.
-- `medium` is the default model for speed and quality balance.
-- `large-v3` can be selected for better accuracy.
+- `medium` is the default model for speed and accuracy balance.
+- `large-v3` is available for better accuracy.
+- GPU mode uses `int8_float16` by default.
 - CPU mode uses `int8`.
 - Language `Auto` lets Whisper detect the spoken language.
 - Selecting one language forces Whisper to use that language.
-- Selecting multiple languages keeps automatic detection because faster-whisper does not limit detection to a custom language subset.
-- The progress bar uses faster-whisper internal progress and updates by 5-second audio chunks.
+- Selecting multiple languages keeps automatic detection because faster-whisper does not limit detection to a custom subset.
+- The progress bar updates from faster-whisper internal progress.

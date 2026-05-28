@@ -1,3 +1,4 @@
+import queue
 import threading
 import time
 import wave
@@ -26,6 +27,8 @@ class AudioRecorder:
         self.last_level = 0.0
         self.microphone = ""
         self.system_output = ""
+        self.mic_gain = 1.8
+        self.system_gain = 0.8
 
     def list_microphones(self):
         try:
@@ -70,6 +73,7 @@ class AudioRecorder:
     def start(self, output_path: Path, settings=None):
         settings = settings or {}
         self.microphone = settings.get("microphone", "")
+        self.mic_gain = float(settings.get("mic_gain", 1.8) or 1.8)
         self.system_output = settings.get("system_output", "")
         status = self.detect_devices()
         if not status.microphone_available:
@@ -101,19 +105,29 @@ class AudioRecorder:
         import sounddevice as sd
 
         speaker = self.selected_speaker(sc)
-        mic_frames = []
+        mic_queue = queue.Queue(maxsize=32)
 
         def callback(indata, frames, time_info, status):
-            mic_frames.append(indata.copy())
+            try:
+                mic_queue.put_nowait(indata.copy())
+            except queue.Full:
+                try:
+                    mic_queue.get_nowait()
+                except queue.Empty:
+                    pass
+                mic_queue.put_nowait(indata.copy())
 
-        with sd.InputStream(device=self.selected_microphone_index(sd), samplerate=self.sample_rate, channels=self.channels, callback=callback):
+        with sd.InputStream(device=self.selected_microphone_index(sd), samplerate=self.sample_rate, channels=self.channels, blocksize=1024, callback=callback):
             with sc.get_microphone(id=str(speaker.name), include_loopback=True).recorder(samplerate=self.sample_rate, channels=self.channels) as recorder:
                 while self.running:
                     system_chunk = recorder.record(numframes=1024)
-                    mic_chunk = mic_frames.pop(0) if mic_frames else np.zeros_like(system_chunk)
-                    chunk = self.normalize_shape(mic_chunk, system_chunk)
+                    try:
+                        mic_chunk = mic_queue.get(timeout=0.08)
+                    except queue.Empty:
+                        mic_chunk = np.zeros_like(system_chunk)
+                    chunk = self.mix_chunks(mic_chunk, system_chunk)
                     self.frames.append(chunk)
-                    self.last_level = self.audio_level(chunk)
+                    self.last_level = max(self.audio_level(mic_chunk), self.audio_level(system_chunk), self.audio_level(chunk))
 
     def record_micro_only(self):
         import sounddevice as sd
@@ -153,13 +167,20 @@ class AudioRecorder:
                 return speaker
         return sc.default_speaker()
 
-    def normalize_shape(self, mic_chunk, system_chunk):
+    def align_chunks(self, mic_chunk, system_chunk):
         mic_chunk = np.asarray(mic_chunk, dtype=np.float32)
         system_chunk = np.asarray(system_chunk, dtype=np.float32)
         size = min(len(mic_chunk), len(system_chunk))
         if size <= 0:
-            return system_chunk
-        mixed = (mic_chunk[:size] + system_chunk[:size]) * 0.5
+            return np.zeros_like(system_chunk), system_chunk
+        return mic_chunk[:size], system_chunk[:size]
+
+    def mix_chunks(self, mic_chunk, system_chunk):
+        mic_chunk, system_chunk = self.align_chunks(mic_chunk, system_chunk)
+        mixed = mic_chunk * self.mic_gain + system_chunk * self.system_gain
+        peak = float(np.max(np.abs(mixed))) if mixed.size else 0.0
+        if peak > 1.0:
+            mixed = mixed / peak
         return np.clip(mixed, -1, 1)
 
     def audio_level(self, chunk):

@@ -1,12 +1,14 @@
+import os
 from pathlib import Path
 
 from PySide6.QtCore import QSize, QThread, QTimer, Signal, Qt
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
     QApplication,
+    QAbstractSpinBox,
     QBoxLayout,
-    QCheckBox,
     QComboBox,
+    QDoubleSpinBox,
     QFileDialog,
     QFrame,
     QGridLayout,
@@ -34,6 +36,29 @@ from src.services.audio import AudioRecorder
 from src.services.storage import StorageService
 from src.services.transcription import TranscriptionService
 from src.ui.waveform import WaveformWidget
+
+
+class Badge(QWidget):
+    def __init__(self, icon_name, text):
+        super().__init__()
+        self.setObjectName("badge")
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(8, 5, 9, 5)
+        layout.setSpacing(6)
+        self.icon = QLabel()
+        self.icon.setPixmap(QIcon(str(Path(__file__).resolve().parents[2] / "assets" / icon_name)).pixmap(14, 14))
+        self.icon.setObjectName("badgeIcon")
+        self.label = QLabel(text)
+        self.label.setObjectName("badgeText")
+        self.label.setWordWrap(False)
+        layout.addWidget(self.icon, 0, Qt.AlignVCenter)
+        layout.addWidget(self.label, 1, Qt.AlignVCenter)
+
+    def setText(self, text):
+        self.label.setText(text)
+
+    def text(self):
+        return self.label.text()
 
 
 class TranscriptionWorker(QThread):
@@ -74,6 +99,7 @@ class MainWindow(QMainWindow):
         self.sessions = []
         self.loading_settings = True
         self.is_compact = False
+        self.transcription_running = False
         self.setWindowTitle("Meet Transcript")
         self.setWindowIcon(QIcon(str(Path(__file__).resolve().parents[2] / "assets" / "app-icon.svg")))
         self.setMinimumSize(760, 620)
@@ -98,7 +124,7 @@ class MainWindow(QMainWindow):
         side.setContentsMargins(10, 14, 10, 14)
         side.setSpacing(10)
         brand = QLabel()
-        brand.setPixmap(QIcon(str(Path(__file__).resolve().parents[2] / "assets" / "app-icon.svg")).pixmap(28, 28))
+        brand.setPixmap(QIcon(str(Path(__file__).resolve().parents[2] / "assets" / "app-icon.svg")).pixmap(22, 22))
         brand.setAlignment(Qt.AlignCenter)
         brand.setObjectName("brandIcon")
         self.record_nav = self.nav_button("mic.svg", "Enregistrement", 0)
@@ -119,10 +145,10 @@ class MainWindow(QMainWindow):
     def nav_button(self, icon_name, tooltip, index):
         button = QToolButton()
         button.setIcon(QIcon(str(Path(__file__).resolve().parents[2] / "assets" / icon_name)))
-        button.setIconSize(QSize(22, 22))
+        button.setIconSize(QSize(18, 18))
         button.setToolTip(tooltip)
         button.setObjectName("navButton")
-        button.setFixedSize(42, 42)
+        button.setFixedSize(36, 36)
         button.clicked.connect(lambda: self.switch_page(index))
         return button
 
@@ -158,16 +184,14 @@ class MainWindow(QMainWindow):
         self.device_row.setContentsMargins(0, 0, 0, 0)
         self.device_row.setHorizontalSpacing(8)
         self.device_row.setVerticalSpacing(8)
-        self.micro_badge = QLabel("Micro: vérification")
-        self.system_badge = QLabel("Audio système: vérification")
-        self.language_badge = QLabel("FR / EN auto")
-        self.model_badge = QLabel("Modèle: medium")
-        self.compute_badge = QLabel("Transcription: vérification")
+        self.micro_badge = Badge("mic.svg", "Micro: vérification")
+        self.system_badge = Badge("audio.svg", "Audio: vérification")
+        self.language_badge = Badge("language.svg", "Langue: Auto")
+        self.model_badge = Badge("model.svg", "Modèle: medium")
+        self.compute_badge = Badge("bolt.svg", "Transcription: vérification")
         self.badges = (self.micro_badge, self.system_badge, self.language_badge, self.model_badge, self.compute_badge)
         for badge in self.badges:
-            badge.setObjectName("badge")
-            badge.setWordWrap(True)
-            badge.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+            badge.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
         self.arrange_badges(3)
         self.record_center = QFrame()
         self.record_center.setObjectName("recordCenter")
@@ -187,8 +211,8 @@ class MainWindow(QMainWindow):
         controls_layout.addWidget(self.start_button)
         controls_layout.addWidget(self.timer_label)
         self.waveform = WaveformWidget()
-        self.waveform.setMinimumHeight(110)
-        self.waveform.setMaximumHeight(150)
+        self.waveform.setMinimumHeight(58)
+        self.waveform.setMaximumHeight(74)
         self.center_layout.addWidget(self.record_controls, 0, Qt.AlignVCenter)
         self.center_layout.addWidget(self.waveform, 1)
         main.addWidget(header)
@@ -208,6 +232,7 @@ class MainWindow(QMainWindow):
         self.recent_empty_label.setAlignment(Qt.AlignCenter)
         self.recent_list = QListWidget()
         self.recent_list.itemSelectionChanged.connect(self.show_selected_session)
+        self.recent_list.itemClicked.connect(lambda item: self.select_session(item.data(Qt.UserRole)))
         self.recent_list.setMinimumHeight(118)
         self.recent_list.setSpacing(6)
         transcript_box = QFrame()
@@ -220,6 +245,8 @@ class MainWindow(QMainWindow):
         transcript_title = QLabel("Transcript")
         transcript_title.setObjectName("sectionTitle")
         self.copy_button = self.svg_icon_button("copy.svg", "Copier")
+        self.copy_button.setProperty("normalIcon", "copy.svg")
+        self.copy_button.setProperty("hoverIcon", "copy-hover.svg")
         self.copy_button.setEnabled(False)
         self.copy_button.clicked.connect(self.copy_transcript)
         transcript_header.addWidget(transcript_title)
@@ -266,8 +293,6 @@ class MainWindow(QMainWindow):
         layout.setSpacing(16)
         title = QLabel("Paramètres")
         title.setObjectName("pageTitle")
-        self.runtime_status_label = QLabel("")
-        self.runtime_status_label.setObjectName("bodyText")
         self.runtime_refresh_button = QPushButton("Vérifier GPU")
         self.runtime_refresh_button.clicked.connect(self.show_gpu_status)
         self.model_combo = self.combo(["small", "medium", "large-v3"])
@@ -276,28 +301,48 @@ class MainWindow(QMainWindow):
         self.device_combo.addItem("CPU", "cpu")
         self.device_combo.currentIndexChanged.connect(self.on_device_changed)
         self.compute_combo = self.combo(["int8_float16", "float16", "int8"])
-        self.require_gpu_check = QCheckBox("GPU obligatoire")
         self.language_combo = QComboBox()
         self.language_combo.setObjectName("languageCombo")
         self.populate_language_combo()
         self.micro_combo = QComboBox()
+        self.mic_gain_input = QDoubleSpinBox()
+        self.mic_gain_input.setRange(0.5, 4.0)
+        self.mic_gain_input.setSingleStep(0.1)
+        self.mic_gain_input.setDecimals(1)
+        self.mic_gain_input.setSuffix("x")
+        self.mic_gain_input.setButtonSymbols(QAbstractSpinBox.NoButtons)
+        self.mic_gain_minus = QToolButton()
+        self.mic_gain_minus.setText("-")
+        self.mic_gain_minus.setObjectName("gainButton")
+        self.mic_gain_minus.clicked.connect(lambda: self.mic_gain_input.stepBy(-1))
+        self.mic_gain_plus = QToolButton()
+        self.mic_gain_plus.setText("+")
+        self.mic_gain_plus.setObjectName("gainButton")
+        self.mic_gain_plus.clicked.connect(lambda: self.mic_gain_input.stepBy(1))
+        mic_gain_control = QWidget()
+        mic_gain_control.setObjectName("gainControl")
+        mic_gain_layout = QHBoxLayout(mic_gain_control)
+        mic_gain_layout.setContentsMargins(0, 0, 0, 0)
+        mic_gain_layout.setSpacing(6)
+        mic_gain_layout.addWidget(self.mic_gain_input, 1)
+        mic_gain_layout.addWidget(self.mic_gain_minus)
+        mic_gain_layout.addWidget(self.mic_gain_plus)
         self.system_output_combo = QComboBox()
         self.output_dir_input = QLineEdit()
         self.output_dir_button = QPushButton("Parcourir")
         self.output_dir_button.clicked.connect(self.choose_output_dir)
-        transcription_section = self.section("Transcription")
+        transcription_section = self.section("Transcription", "bolt.svg")
         transcription_layout = transcription_section.layout()
         transcription_layout.addWidget(self.form_row("Modèle", self.model_combo))
         transcription_layout.addWidget(self.form_row("Device", self.device_combo))
         transcription_layout.addWidget(self.form_row("Compute", self.compute_combo))
-        transcription_layout.addWidget(self.require_gpu_check)
-        transcription_layout.addWidget(self.runtime_status_label)
         transcription_layout.addWidget(self.runtime_refresh_button)
-        audio_section = self.section("Audio")
+        audio_section = self.section("Audio", "audio.svg")
         audio_layout = audio_section.layout()
         audio_layout.addWidget(self.form_row("Micro", self.micro_combo))
+        audio_layout.addWidget(self.form_row("Gain micro", mic_gain_control))
         audio_layout.addWidget(self.form_row("Sortie audio système", self.system_output_combo))
-        language_section = self.section("Langues")
+        language_section = self.section("Langues", "language.svg")
         language_section.layout().addWidget(self.form_row("Détection", self.language_combo))
         output_row = QWidget()
         output_layout = QHBoxLayout(output_row)
@@ -305,7 +350,7 @@ class MainWindow(QMainWindow):
         output_layout.setSpacing(10)
         output_layout.addWidget(self.output_dir_input)
         output_layout.addWidget(self.output_dir_button)
-        storage_section = self.section("Stockage")
+        storage_section = self.section("Stockage", "storage.svg")
         storage_section.layout().addWidget(self.form_row("Dossier de sortie", output_row))
         layout.addWidget(title)
         layout.addWidget(transcription_section)
@@ -315,15 +360,27 @@ class MainWindow(QMainWindow):
         layout.addStretch()
         return scroll
 
-    def section(self, title):
+    def section(self, title, icon_name=None):
         box = QFrame()
         box.setObjectName("settingsSection")
         layout = QVBoxLayout(box)
         layout.setContentsMargins(18, 16, 18, 18)
         layout.setSpacing(12)
+        header = QWidget()
+        header.setObjectName("sectionHeader")
+        header_layout = QHBoxLayout(header)
+        header_layout.setContentsMargins(0, 0, 0, 0)
+        header_layout.setSpacing(8)
+        if icon_name:
+            icon = QLabel()
+            icon.setObjectName("sectionIcon")
+            icon.setPixmap(QIcon(str(Path(__file__).resolve().parents[2] / "assets" / icon_name)).pixmap(16, 16))
+            header_layout.addWidget(icon, 0, Qt.AlignVCenter)
         label = QLabel(title)
         label.setObjectName("sectionTitle")
-        layout.addWidget(label)
+        header_layout.addWidget(label, 0, Qt.AlignVCenter)
+        header_layout.addStretch()
+        layout.addWidget(header)
         return box
 
     def combo(self, values):
@@ -467,16 +524,22 @@ class MainWindow(QMainWindow):
     def svg_icon_button(self, name, tooltip):
         button = QToolButton()
         button.setIcon(QIcon(str(Path(__file__).resolve().parents[2] / "assets" / name)))
-        button.setIconSize(QSize(18, 18))
+        button.setIconSize(QSize(15, 15))
         button.setToolTip(tooltip)
         button.setObjectName("iconButton")
+        button.setFixedSize(28, 28)
+        button.enterEvent = lambda event, item=button: self.set_button_icon(item, item.property("hoverIcon") or name)
+        button.leaveEvent = lambda event, item=button: self.set_button_icon(item, item.property("normalIcon") or name)
         return button
+
+    def set_button_icon(self, button, name):
+        button.setIcon(QIcon(str(Path(__file__).resolve().parents[2] / "assets" / name)))
 
     def load_settings_to_ui(self):
         self.set_combo(self.model_combo, self.settings.get("model", "medium"))
         self.set_combo_data(self.device_combo, self.settings.get("device", "cuda"))
         self.set_combo(self.compute_combo, self.settings.get("compute_type", "int8_float16"))
-        self.require_gpu_check.setChecked(bool(self.settings.get("require_gpu", True)))
+        self.mic_gain_input.setValue(float(self.settings.get("mic_gain", 1.8)))
         self.set_selected_languages(self.settings.get("languages", ["auto"]))
         self.output_dir_input.setText(self.settings.get("output_dir", str(self.storage.base_dir)))
         self.refresh_device_choices()
@@ -486,10 +549,10 @@ class MainWindow(QMainWindow):
         self.model_combo.currentIndexChanged.connect(self.auto_save_settings)
         self.device_combo.currentIndexChanged.connect(self.auto_save_settings)
         self.compute_combo.currentIndexChanged.connect(self.auto_save_settings)
-        self.require_gpu_check.stateChanged.connect(self.auto_save_settings)
         self.language_combo.currentIndexChanged.connect(self.auto_save_settings)
         self.language_combo.currentIndexChanged.connect(self.refresh_language_combo_style)
         self.micro_combo.currentIndexChanged.connect(self.auto_save_settings)
+        self.mic_gain_input.valueChanged.connect(self.auto_save_settings)
         self.system_output_combo.currentIndexChanged.connect(self.auto_save_settings)
         self.output_dir_input.editingFinished.connect(self.auto_save_settings)
 
@@ -539,13 +602,10 @@ class MainWindow(QMainWindow):
 
     def on_device_changed(self):
         is_gpu = self.device_combo.currentData() == "cuda"
-        self.require_gpu_check.setEnabled(is_gpu)
         if is_gpu:
-            self.require_gpu_check.setChecked(True)
             if self.compute_combo.currentText() == "int8":
                 self.set_combo(self.compute_combo, "int8_float16")
         else:
-            self.require_gpu_check.setChecked(False)
             self.set_combo(self.compute_combo, "int8")
         self.refresh_runtime_status()
 
@@ -561,9 +621,10 @@ class MainWindow(QMainWindow):
             "model": self.model_combo.currentText(),
             "device": self.device_combo.currentData() or "cuda",
             "compute_type": "int8" if self.device_combo.currentData() == "cpu" else self.compute_combo.currentText(),
-            "require_gpu": self.device_combo.currentData() == "cuda" and self.require_gpu_check.isChecked(),
+            "require_gpu": self.device_combo.currentData() == "cuda",
             "languages": languages,
             "microphone": self.micro_combo.currentData() or "",
+            "mic_gain": round(float(self.mic_gain_input.value()), 2),
             "system_output": self.system_output_combo.currentData() or "",
             "output_dir": self.output_dir_input.text().strip() or str(Path.cwd() / "transcripts"),
         }
@@ -580,14 +641,17 @@ class MainWindow(QMainWindow):
 
     def refresh_devices(self):
         self.recorder.microphone = self.settings.get("microphone", "")
+        self.recorder.mic_gain = float(self.settings.get("mic_gain", 1.8))
         self.recorder.system_output = self.settings.get("system_output", "")
         status = self.recorder.detect_devices()
-        self.micro_badge.setText(f"Micro détecté: {status.microphone_name}" if status.microphone_available else "Aucun micro détecté")
-        self.micro_badge.setProperty("state", "ok" if status.microphone_available else "blocked")
-        self.system_badge.setText(f"Audio système prêt: {status.system_name}" if status.system_audio_available else "Audio système indisponible")
-        self.system_badge.setProperty("state", "ok" if status.system_audio_available else "blocked")
+        self.micro_badge.setText(f"Micro: {status.microphone_name}" if status.microphone_available else "Aucun micro")
+        self.micro_badge.setProperty("state", "neutral" if status.microphone_available else "blocked")
+        self.system_badge.setText(f"Audio: {status.system_name}" if status.system_audio_available else "Audio indisponible")
+        self.system_badge.setProperty("state", "neutral" if status.system_audio_available else "blocked")
         languages = self.settings.get("languages", ["auto"])
-        self.language_badge.setText("Langues: Auto" if "auto" in languages else "Langues: " + "/".join(language.upper() for language in languages))
+        language_text = "Auto" if "auto" in languages else "/".join(language.upper() for language in languages)
+        self.language_badge.setText("Langue: " + language_text)
+        self.language_badge.setToolTip("Langues: " + language_text)
         self.language_badge.setProperty("state", "neutral")
         self.model_badge.setText(f"Modèle: {self.settings.get('model', 'medium')}")
         self.model_badge.setProperty("state", "neutral")
@@ -601,21 +665,9 @@ class MainWindow(QMainWindow):
             self.transcription.configure(self.collect_settings())
         status = self.transcription.runtime_status()
         self.compute_badge.setText(f"Transcription: {status.backend}")
-        self.compute_badge.setProperty("state", "ok" if status.backend == "GPU" else "blocked" if "bloque" in status.backend else "neutral")
+        self.compute_badge.setProperty("state", "neutral" if status.backend == "GPU" else "blocked" if "bloque" in status.backend else "neutral")
         self.compute_badge.style().unpolish(self.compute_badge)
         self.compute_badge.style().polish(self.compute_badge)
-        self.runtime_status_label.setText(
-            "\n".join(
-                [
-                    f"Backend utilisé: {status.backend}",
-                    f"GPU détecté: {'oui' if status.gpu_detected else 'non'}",
-                    f"CUDA prêt: {'oui' if status.cuda_ready else 'non'}",
-                    f"Modèle: {status.model}",
-                    f"Compute: {status.compute_type}",
-                    f"État: {status.message}",
-                ]
-            )
-        )
         return status
 
     def show_gpu_status(self):
@@ -652,7 +704,7 @@ class MainWindow(QMainWindow):
             self.elapsed_seconds = 0
             self.timer.start(200)
             self.start_button.setText("Arrêter")
-            self.status_label.setText("Enregistrement en cours")
+            self.status_label.setText("Enregistrement en cours ...")
             self.status_label.setProperty("state", "recording")
             self.status_label.style().unpolish(self.status_label)
             self.status_label.style().polish(self.status_label)
@@ -684,6 +736,7 @@ class MainWindow(QMainWindow):
         self.transcription_progress.setVisible(True)
         audio_path, duration = self.recorder.stop()
         self.worker = TranscriptionWorker(self.transcription, self.storage, self.current_session_id, audio_path, duration)
+        self.transcription_running = True
         self.worker.progress.connect(self.on_transcription_progress)
         self.worker.finished_ok.connect(self.on_transcription_done)
         self.worker.failed.connect(self.on_transcription_failed)
@@ -696,6 +749,7 @@ class MainWindow(QMainWindow):
         self.waveform.set_level(self.recorder.last_level)
 
     def on_transcription_done(self, session):
+        self.transcription_running = False
         self.status_label.setText("Transcription terminée")
         self.status_label.setProperty("state", "done")
         self.status_label.style().unpolish(self.status_label)
@@ -712,6 +766,7 @@ class MainWindow(QMainWindow):
         self.select_session(session.id)
 
     def on_transcription_failed(self, message):
+        self.transcription_running = False
         self.status_label.setText("Erreur transcription")
         self.status_label.setProperty("state", "error")
         self.status_label.style().unpolish(self.status_label)
@@ -733,6 +788,19 @@ class MainWindow(QMainWindow):
         self.transcription_progress.setFormat("%p%")
         self.transcription_progress.setValue(max(0, min(100, int(value))))
 
+    def closeEvent(self, event):
+        if not self.recorder.running and not self.transcription_running:
+            event.accept()
+            return
+        message = "Un enregistrement est en cours. Voulez-vous vraiment quitter ?" if self.recorder.running else "Une transcription est en cours. Voulez-vous vraiment quitter ?"
+        answer = QMessageBox.question(self, "Quitter Meet Transcript", message, QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if answer == QMessageBox.Yes:
+            if self.recorder.running:
+                self.recorder.stop()
+            event.accept()
+        else:
+            event.ignore()
+
     def load_history(self):
         self.sessions = self.storage.load_sessions()
         self.recent_list.clear()
@@ -751,21 +819,60 @@ class MainWindow(QMainWindow):
         row.setObjectName("sessionRow")
         layout = QHBoxLayout(row)
         layout.setContentsMargins(10, 5, 10, 5)
-        layout.setSpacing(6)
+        layout.setSpacing(4)
         duration = self.format_duration(session.duration_seconds)
-        label = QPushButton(f"{session.title}  ·  {session.language.upper()}  ·  {duration}")
+        date_text = session.created_at.strftime("%d/%m/%Y %H:%M")
+        content = QWidget()
+        content.setObjectName("sessionContent")
+        content_layout = QVBoxLayout(content)
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(2)
+        label = QPushButton(session.title)
         label.setObjectName("sessionButton")
+        label.setCursor(Qt.PointingHandCursor)
         label.clicked.connect(lambda: self.select_session(session.id))
+        meta = QWidget()
+        meta.setObjectName("sessionMeta")
+        meta_layout = QHBoxLayout(meta)
+        meta_layout.setContentsMargins(5, 0, 0, 0)
+        meta_layout.setSpacing(5)
+        calendar_icon = QLabel()
+        calendar_icon.setPixmap(QIcon(str(Path(__file__).resolve().parents[2] / "assets" / "calendar.svg")).pixmap(12, 12))
+        date_label = QLabel(date_text)
+        date_label.setObjectName("sessionMetaText")
+        clock_icon = QLabel()
+        clock_icon.setPixmap(QIcon(str(Path(__file__).resolve().parents[2] / "assets" / "clock.svg")).pixmap(12, 12))
+        duration_label = QLabel(duration)
+        duration_label.setObjectName("sessionMetaText")
+        meta_layout.addWidget(calendar_icon, 0, Qt.AlignVCenter)
+        meta_layout.addWidget(date_label, 0, Qt.AlignVCenter)
+        meta_layout.addSpacing(8)
+        meta_layout.addWidget(clock_icon, 0, Qt.AlignVCenter)
+        meta_layout.addWidget(duration_label, 0, Qt.AlignVCenter)
+        meta_layout.addStretch()
+        content_layout.addWidget(label)
+        content_layout.addWidget(meta)
+        play_button = self.svg_icon_button("play.svg", "Écouter")
         rename_button = self.svg_icon_button("edit.svg", "Renommer")
         delete_button = self.svg_icon_button("trash.svg", "Supprimer")
+        play_button.setProperty("role", "action")
         rename_button.setProperty("role", "action")
         delete_button.setProperty("role", "delete")
+        play_button.setProperty("normalIcon", "play.svg")
+        play_button.setProperty("hoverIcon", "play-hover.svg")
+        rename_button.setProperty("normalIcon", "edit.svg")
+        rename_button.setProperty("hoverIcon", "edit-hover.svg")
+        delete_button.setProperty("normalIcon", "trash.svg")
+        delete_button.setProperty("hoverIcon", "trash-hover.svg")
+        play_button.clicked.connect(lambda: self.play_session(session.id))
         rename_button.clicked.connect(lambda: self.rename_session(session.id))
         delete_button.clicked.connect(lambda: self.delete_session(session.id))
-        layout.addWidget(label, 1)
-        layout.addWidget(rename_button)
-        layout.addWidget(delete_button)
-        row.setMinimumHeight(42)
+        row.mousePressEvent = lambda event: self.select_session(session.id)
+        layout.addWidget(content, 1, Qt.AlignVCenter)
+        layout.addWidget(play_button, 0, Qt.AlignVCenter)
+        layout.addWidget(rename_button, 0, Qt.AlignVCenter)
+        layout.addWidget(delete_button, 0, Qt.AlignVCenter)
+        row.setMinimumHeight(54)
         return row
 
     def format_duration(self, seconds):
@@ -777,6 +884,8 @@ class MainWindow(QMainWindow):
             item = self.recent_list.item(index)
             if item.data(Qt.UserRole) == session_id:
                 self.recent_list.setCurrentItem(item)
+                self.show_selected_session()
+                self.history_tabs.setCurrentIndex(1)
                 self.update_session_selection_styles()
                 return
 
@@ -820,6 +929,15 @@ class MainWindow(QMainWindow):
             self.load_history()
             self.select_session(session.id)
 
+    def play_session(self, session_id):
+        session = next((item for item in self.sessions if item.id == session_id), None)
+        if not session:
+            return
+        if not session.audio_path.exists():
+            QMessageBox.warning(self, "Audio introuvable", "Le fichier audio de cette session est introuvable.")
+            return
+        os.startfile(session.audio_path)
+
     def delete_session(self, session_id):
         session = next((item for item in self.sessions if item.id == session_id), None)
         if not session:
@@ -836,44 +954,74 @@ class MainWindow(QMainWindow):
         self.update_responsive_layout()
 
     def update_responsive_layout(self):
-        compact = self.width() < 980
-        if compact == self.is_compact:
+        stacked = self.width() < 860
+        medium = self.width() < 1270
+        compact = stacked or medium
+        if compact == self.is_compact and getattr(self, "is_stacked", None) == stacked:
             return
         self.is_compact = compact
-        if compact:
+        self.is_stacked = stacked
+        if stacked:
             self.sidebar.setFixedWidth(64)
             self.record_layout.setDirection(QBoxLayout.TopToBottom)
             self.record_layout.setContentsMargins(14, 12, 14, 14)
             self.record_layout.setSpacing(10)
+            self.record_layout.setStretchFactor(self.record_main_panel, 0)
+            self.record_layout.setStretchFactor(self.history_panel, 0)
             self.clear_badge_layout()
             self.arrange_badges(2)
             self.center_layout.setDirection(QBoxLayout.LeftToRight)
             self.center_layout.setContentsMargins(12, 10, 12, 10)
             self.center_layout.setSpacing(10)
-            self.record_center.setMinimumHeight(132)
+            self.record_center.setMinimumHeight(122)
             self.start_button.setFixedSize(132, 46)
             self.timer_label.setMinimumWidth(86)
-            self.waveform.setMinimumHeight(92)
-            self.waveform.setMaximumHeight(120)
-            self.waveform.setMinimumWidth(150)
+            self.waveform.setMinimumHeight(82)
+            self.waveform.setMaximumHeight(96)
+            self.waveform.setMinimumWidth(120)
+            self.waveform.setMaximumWidth(16777215)
             self.history_panel.setMinimumHeight(250)
             self.recent_list.setMinimumHeight(90)
+        elif medium:
+            self.sidebar.setFixedWidth(64)
+            self.record_layout.setDirection(QBoxLayout.LeftToRight)
+            self.record_layout.setContentsMargins(18, 20, 20, 20)
+            self.record_layout.setSpacing(14)
+            self.record_layout.setStretchFactor(self.record_main_panel, 3)
+            self.record_layout.setStretchFactor(self.history_panel, 3)
+            self.clear_badge_layout()
+            self.arrange_badges(1)
+            self.center_layout.setDirection(QBoxLayout.LeftToRight)
+            self.center_layout.setContentsMargins(12, 10, 12, 10)
+            self.center_layout.setSpacing(10)
+            self.record_center.setMinimumHeight(112)
+            self.start_button.setFixedSize(126, 44)
+            self.timer_label.setMinimumWidth(82)
+            self.waveform.setMinimumHeight(76)
+            self.waveform.setMaximumHeight(90)
+            self.waveform.setMinimumWidth(100)
+            self.waveform.setMaximumWidth(16777215)
+            self.history_panel.setMinimumHeight(0)
+            self.recent_list.setMinimumHeight(100)
         else:
             self.sidebar.setFixedWidth(64)
             self.record_layout.setDirection(QBoxLayout.LeftToRight)
             self.record_layout.setContentsMargins(22, 24, 24, 24)
             self.record_layout.setSpacing(18)
+            self.record_layout.setStretchFactor(self.record_main_panel, 5)
+            self.record_layout.setStretchFactor(self.history_panel, 3)
             self.clear_badge_layout()
             self.arrange_badges(3)
             self.center_layout.setDirection(QBoxLayout.LeftToRight)
             self.center_layout.setContentsMargins(14, 12, 14, 12)
             self.center_layout.setSpacing(14)
-            self.record_center.setMinimumHeight(150)
+            self.record_center.setMinimumHeight(132)
             self.start_button.setFixedSize(142, 50)
             self.timer_label.setMinimumWidth(110)
-            self.waveform.setMinimumHeight(110)
-            self.waveform.setMaximumHeight(150)
-            self.waveform.setMinimumWidth(180)
+            self.waveform.setMinimumHeight(86)
+            self.waveform.setMaximumHeight(100)
+            self.waveform.setMinimumWidth(140)
+            self.waveform.setMaximumWidth(16777215)
             self.history_panel.setMinimumHeight(0)
             self.recent_list.setMinimumHeight(110)
 
@@ -881,16 +1029,18 @@ class MainWindow(QMainWindow):
         self.setStyleSheet(
             """
             QMainWindow { background: #101216; color: #f3f6f8; }
-            QWidget { background: #101216; color: #f3f6f8; font-family: Segoe UI; font-size: 14px; }
+            QWidget { background: #101216; color: #f3f6f8; font-family: Segoe UI; font-size: 10pt; }
             #sidebar { background: #171a20; min-width: 64px; max-width: 64px; border-right: 1px solid #202630; }
             QLabel { background: transparent; }
             #brandIcon { background: transparent; }
-            #navButton { border: 0; border-radius: 8px; background: transparent; padding: 8px; }
+            #navButton { border: 0; border-radius: 8px; background: transparent; padding: 6px; }
             #navButton:hover { background: transparent; }
             #navButton[active="true"] { background: transparent; border-left: 3px solid #14b8a6; }
-            #pageTitle { font-size: 25px; font-weight: 700; }
-            #sectionTitle { font-size: 16px; font-weight: 650; background: transparent; }
-            #statusLabel { color: #f0b35a; font-size: 14px; }
+            #pageTitle { font-size: 18pt; font-weight: 700; }
+            #sectionTitle { font-size: 12pt; font-weight: 650; background: transparent; }
+            #sectionHeader { background: transparent; }
+            #sectionIcon { background: transparent; }
+            #statusLabel { color: #f0b35a; font-size: 10pt; }
             #statusLabel[state="done"] { color: #62f0c8; }
             #statusLabel[state="error"] { color: #ffb4a8; }
             #statusLabel[state="working"] { color: #dce5ec; }
@@ -900,20 +1050,22 @@ class MainWindow(QMainWindow):
             #emptyText { color: #7f8b98; padding: 22px; border: 1px dashed #2a313b; border-radius: 8px; }
             #formLabel { color: #b8c0cc; min-width: 140px; }
             #formRow { background: transparent; }
-            #badge { background: #202630; color: #dce5ec; padding: 5px 9px; border-radius: 7px; font-size: 12px; }
+            #badge { background: #202630; color: #dce5ec; border-radius: 7px; font-size: 9pt; }
+            #badgeIcon { background: transparent; }
+            #badgeText { background: transparent; color: #dce5ec; font-size: 9pt; }
             #badge[state="ok"] { background: #143f35; color: #62f0c8; }
             #badge[state="blocked"] { background: #4a1d1d; color: #ffb4a8; }
             #badge[state="neutral"] { background: #202630; color: #dce5ec; }
             #panel, #recordCenter, #settingsSection { background: #171a20; border-radius: 8px; }
             #recordControls { background: transparent; }
             #transcriptBox { background: #101216; border: 1px solid #2a313b; border-radius: 8px; }
-            #startButton { min-width: 132px; min-height: 46px; border-radius: 10px; background: #14b8a6; color: #061412; font-size: 14px; font-weight: 800; border: 0; padding: 0 12px; }
+            #startButton { min-width: 132px; min-height: 46px; border-radius: 10px; background: #14b8a6; color: #061412; font-size: 10pt; font-weight: 800; border: 0; padding: 0 12px; }
             #startButton:hover { background: #14b8a6; }
             #startButton[recording="true"] { background: #ef4444; color: #ffffff; }
             #startButton[recording="true"]:hover { background: #ef4444; }
             #startButton:disabled { background: #41505a; color: #aab4bc; }
-            #timerLabel { font-size: 28px; font-weight: 700; color: #ffffff; }
-            QListWidget, QTextEdit, QComboBox, QLineEdit { background: #101216; border: 1px solid #2a313b; border-radius: 8px; padding: 8px; color: #edf2f6; selection-background-color: #143f35; }
+            #timerLabel { font-size: 21pt; font-weight: 700; color: #ffffff; }
+            QListWidget, QTextEdit, QComboBox, QLineEdit, QDoubleSpinBox { background: #101216; border: 1px solid #2a313b; border-radius: 8px; padding: 8px; color: #edf2f6; selection-background-color: #143f35; }
             #languageCombo[selected="true"] { color: #62f0c8; border: 1px solid #14b8a6; background: #101216; }
             #transcriptPreview { border: 0; border-top: 1px solid #2a313b; border-radius: 0; }
             QListWidget::item { padding: 0; border-radius: 7px; background: transparent; margin: 0; min-height: 42px; }
@@ -926,19 +1078,35 @@ class MainWindow(QMainWindow):
             QTabBar::tab { background: #101216; color: #b8c0cc; border: 1px solid #2a313b; border-radius: 7px; padding: 6px 12px; margin-right: 6px; }
             QTabBar::tab:selected { background: #143f35; color: #62f0c8; border: 1px solid #14b8a6; }
             QTabBar::tab:hover { background: #101216; }
+            QListWidget::item:hover { background: transparent; }
             #sessionRow { background: #202630; border: 1px solid #303946; border-radius: 7px; }
+            #sessionRow:hover { background: #24343b; border: 1px solid #14b8a6; }
             #sessionRow[selected="true"] { background: #24343b; border: 1px solid #14b8a6; }
-            #sessionButton { text-align: left; background: transparent; padding: 3px 6px; color: #f3f6f8; font-weight: 600; min-height: 28px; font-size: 12px; }
-            #sessionButton:hover { background: transparent; color: #ffffff; }
-            #iconButton { background: transparent; border: 1px solid transparent; border-radius: 8px; padding: 6px; min-width: 32px; min-height: 32px; }
-            #iconButton:hover { background: #101216; border: 1px solid #303946; }
-            #iconButton[role="action"]:hover { border: 1px solid #14b8a6; }
-            #iconButton[role="delete"]:hover { border: 1px solid #ef4444; }
+            #sessionContent, #sessionMeta { background: transparent; }
+            #sessionButton { text-align: left; background: transparent; padding: 0 5px; color: #f3f6f8; font-weight: 650; min-height: 20px; font-size: 9pt; }
+            #sessionButton:hover { background: transparent; color: #62f0c8; }
+            #sessionMetaText { color: #96a3af; font-size: 8pt; background: transparent; }
+            #iconButton { background: transparent; border: 0; border-radius: 0; padding: 3px; min-width: 24px; min-height: 24px; }
+            #iconButton:hover { background: transparent; border: 0; }
+            #iconButton:pressed { background: transparent; border: 0; }
+            #iconButton[role="action"]:hover { background: transparent; border: 0; }
+            #iconButton[role="delete"]:hover { background: transparent; border: 0; }
             #iconButton:disabled { opacity: 0.35; }
-            QCheckBox { color: #dce5ec; spacing: 10px; background: transparent; }
-            QCheckBox::indicator { background: #101216; border: 1px solid #303946; border-radius: 4px; width: 16px; height: 16px; }
-            QCheckBox::indicator:checked { background: #14b8a6; border: 1px solid #14b8a6; }
-            QComboBox, QLineEdit { min-height: 22px; }
+            #gainControl { background: transparent; }
+            #gainButton { background: #101216; border: 1px solid #2a313b; border-radius: 8px; min-width: 34px; min-height: 34px; color: #62f0c8; font-size: 13pt; font-weight: 700; padding: 0; }
+            #gainButton:hover { background: #101216; border: 1px solid #14b8a6; }
+            #gainButton:pressed { background: #101216; color: #62f0c8; border: 1px solid #62f0c8; }
+            QComboBox, QLineEdit, QDoubleSpinBox { min-height: 22px; }
             QScrollArea, #pageScroll { border: 0; background: #101216; }
+            QScrollBar:vertical { background: transparent; width: 8px; margin: 2px; }
+            QScrollBar::handle:vertical { background: #303946; border-radius: 4px; min-height: 28px; }
+            QScrollBar::handle:vertical:hover { background: #3b4654; }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; background: transparent; border: 0; }
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: transparent; }
+            QScrollBar:horizontal { background: transparent; height: 8px; margin: 2px; }
+            QScrollBar::handle:horizontal { background: #303946; border-radius: 4px; min-width: 28px; }
+            QScrollBar::handle:horizontal:hover { background: #3b4654; }
+            QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal { width: 0; background: transparent; border: 0; }
+            QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal { background: transparent; }
             """
         )
