@@ -21,7 +21,8 @@ Meet Transcript is a Windows desktop app built with Python and PySide6. It recor
 - GPU or CPU transcription mode
 - GPU readiness check from the app
 - Whisper model selection: `small`, `medium`, `large-v3`
-- Whisper language mode with `Auto` by default
+- Automatic Whisper language detection
+- Interface language setting: English or French
 - Real transcription progress from faster-whisper internal progress
 - Recent sessions list with compact metadata
 - Default session names: `Session 1`, `Session 2`, `Session 3`
@@ -58,7 +59,7 @@ Run the app:
 .\run.ps1
 ```
 
-`run.ps1` prepares CUDA/cuDNN DLL paths and starts the app. Model, device, language, microphone, gain, and output settings are managed directly inside the UI.
+`run.ps1` prepares CUDA/cuDNN DLL paths and starts the app. Model, device, interface language, microphone, gain, and output settings are managed directly inside the UI.
 
 ## From Windows Release
 
@@ -96,7 +97,8 @@ The release is published automatically on GitHub with generated release notes.
 model: medium
 device: GPU
 compute type: int8_float16
-languages: Auto
+interface language: English
+transcription language detection: Auto
 microphone: Auto
 microphone gain: 1.8x
 system output: Auto
@@ -165,7 +167,6 @@ The app stores session metadata in `history.json`. Deleting a session from the a
 - `large-v3` is available for better accuracy.
 - GPU mode uses `int8_float16` by default.
 - CPU mode uses `int8`.
-- Language `Auto` lets Whisper detect the spoken language.
-- Selecting one language forces Whisper to use that language.
-- Selecting multiple languages keeps automatic detection because faster-whisper does not limit detection to a custom subset.
+- Whisper language detection is always automatic.
+- The app interface can be switched between English and French.
 - The progress bar updates from faster-whisper internal progress.

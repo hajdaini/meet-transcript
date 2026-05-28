@@ -97,7 +97,7 @@ class StorageService:
             "device": "cuda",
             "compute_type": "int8_float16",
             "require_gpu": True,
-            "languages": ["auto"],
+            "interface_language": "en",
             "progress_chunk_seconds": 5,
             "microphone": "",
             "mic_gain": 1.8,
@@ -112,8 +112,7 @@ class StorageService:
             settings = {}
         default = self.default_settings()
         default.update(settings)
-        if set(default.get("languages", [])) == {"fr", "en"}:
-            default["languages"] = ["auto"]
+        default.pop("languages", None)
         return default
 
     def save_settings(self, settings):

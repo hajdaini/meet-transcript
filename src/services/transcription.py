@@ -76,7 +76,7 @@ class MockTranscriptionProvider:
             "Transcript de demonstration.\n\n"
             f"Audio source: {name}\n\n"
             "Whisper local est pret a etre branche avec faster-whisper. "
-            "La detection automatique francais/anglais utilisera language=None."
+            "La detection automatique utilisera language=None."
         )
         if progress_callback:
             progress_callback(100)
@@ -92,7 +92,6 @@ class FasterWhisperProvider:
         self.device = settings.get("device") or os.getenv("MEET_TRANSCRIPT_DEVICE", "cuda")
         self.compute_type = settings.get("compute_type") or os.getenv("MEET_TRANSCRIPT_COMPUTE_TYPE", "int8_float16")
         self.require_gpu = bool(settings.get("require_gpu", os.getenv("MEET_TRANSCRIPT_REQUIRE_GPU", "1") == "1"))
-        self.languages = settings.get("languages", ["auto"])
         self.progress_chunk_seconds = int(settings.get("progress_chunk_seconds", 5) or 5)
         self.WhisperModel = WhisperModel
         if self.require_gpu and self.device != "cuda":
@@ -136,11 +135,11 @@ class FasterWhisperProvider:
 
     def transcribe(self, audio_path: Path, progress_callback=None):
         try:
-            segments, info = self.model.transcribe(str(audio_path), language=self.language_hint(), vad_filter=True, log_progress=bool(progress_callback), chunk_length=self.chunk_length(progress_callback))
+            segments, info = self.model.transcribe(str(audio_path), language=None, vad_filter=True, log_progress=bool(progress_callback), chunk_length=self.chunk_length(progress_callback))
         except Exception:
             if self.device != "cpu" and not self.require_gpu:
                 self.load_cpu_model()
-                segments, info = self.model.transcribe(str(audio_path), language=self.language_hint(), vad_filter=True, log_progress=bool(progress_callback), chunk_length=self.chunk_length(progress_callback))
+                segments, info = self.model.transcribe(str(audio_path), language=None, vad_filter=True, log_progress=bool(progress_callback), chunk_length=self.chunk_length(progress_callback))
             else:
                 raise
         parts = []
@@ -172,14 +171,6 @@ class FasterWhisperProvider:
                     parts.append(content)
         finally:
             transcribe_module.tqdm = original_tqdm
-
-    def language_hint(self):
-        languages = [language for language in self.languages if language and language != "auto"]
-        if "auto" in self.languages:
-            return None
-        if len(languages) == 1:
-            return languages[0]
-        return None
 
     def chunk_length(self, progress_callback):
         if progress_callback:

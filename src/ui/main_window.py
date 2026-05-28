@@ -39,6 +39,136 @@ from src.services.transcription import TranscriptionService
 from src.ui.waveform import WaveformWidget
 
 
+TRANSLATIONS = {
+    "en": {
+        "recording": "Recording",
+        "settings": "Settings",
+        "ready": "Ready to record",
+        "micro_check": "Microphone: checking",
+        "audio_check": "Audio: checking",
+        "model_badge": "Model: {model}",
+        "transcription_check": "Transcription: checking",
+        "start": "Start",
+        "stop": "Stop",
+        "transcribing": "Transcribing",
+        "recording_active": "Recording in progress ...",
+        "transcribing_status": "Transcription in progress",
+        "transcription_done": "Transcription complete",
+        "transcription_error": "Transcription error",
+        "recent_sessions": "Recent sessions",
+        "empty_sessions": "No recorded sessions",
+        "transcript": "Transcript",
+        "copy": "Copy",
+        "select_session": "Select a session to display its transcript.",
+        "sessions_tab": "Sessions",
+        "transcript_tab": "Transcript",
+        "verify_gpu": "Verify GPU",
+        "transcription": "Transcription",
+        "model": "Model",
+        "device": "Device",
+        "compute": "Compute",
+        "audio": "Audio",
+        "microphone": "Microphone",
+        "mic_gain": "Microphone gain",
+        "system_output": "System audio output",
+        "interface": "Interface",
+        "interface_language": "Language",
+        "storage": "Storage",
+        "output_folder": "Output folder",
+        "browse": "Browse",
+        "auto": "Auto",
+        "record_impossible": "Recording unavailable",
+        "choose_output_folder": "Output folder",
+        "micro_ready": "Microphone: {name}",
+        "micro_missing": "No microphone",
+        "audio_ready": "Audio: {name}",
+        "audio_missing": "Audio unavailable",
+        "transcription_backend": "Transcription: {backend}",
+        "gpu_ready_title": "GPU detected",
+        "gpu_ready_text": "GPU detected",
+        "gpu_blocked_title": "GPU unavailable",
+        "gpu_blocked_text": "GPU unavailable",
+        "close_title": "Quit Meet Transcript",
+        "close_recording": "A recording is in progress. Do you really want to quit?",
+        "close_transcription": "A transcription is in progress. Do you really want to quit?",
+        "listen": "Listen",
+        "rename": "Rename",
+        "delete": "Delete",
+        "rename_title": "Rename",
+        "recording_name": "Recording name",
+        "audio_missing_title": "Audio not found",
+        "audio_missing_message": "The audio file for this session cannot be found.",
+        "delete_confirm": "Delete {title}?",
+        "error": "Error",
+        "english": "English",
+        "french": "French",
+    },
+    "fr": {
+        "recording": "Enregistrement",
+        "settings": "Paramètres",
+        "ready": "Prêt à enregistrer",
+        "micro_check": "Micro: vérification",
+        "audio_check": "Audio: vérification",
+        "model_badge": "Modèle: {model}",
+        "transcription_check": "Transcription: vérification",
+        "start": "Démarrer",
+        "stop": "Arrêter",
+        "transcribing": "Transcription",
+        "recording_active": "Enregistrement en cours ...",
+        "transcribing_status": "Transcription en cours",
+        "transcription_done": "Transcription terminée",
+        "transcription_error": "Erreur transcription",
+        "recent_sessions": "Sessions récentes",
+        "empty_sessions": "Aucune session enregistrée",
+        "transcript": "Transcript",
+        "copy": "Copier",
+        "select_session": "Sélectionnez une session pour afficher son transcript.",
+        "sessions_tab": "Sessions",
+        "transcript_tab": "Transcript",
+        "verify_gpu": "Vérifier GPU",
+        "transcription": "Transcription",
+        "model": "Modèle",
+        "device": "Device",
+        "compute": "Compute",
+        "audio": "Audio",
+        "microphone": "Micro",
+        "mic_gain": "Gain micro",
+        "system_output": "Sortie audio système",
+        "interface": "Interface",
+        "interface_language": "Langue",
+        "storage": "Stockage",
+        "output_folder": "Dossier de sortie",
+        "browse": "Parcourir",
+        "auto": "Auto",
+        "record_impossible": "Enregistrement impossible",
+        "choose_output_folder": "Dossier de sortie",
+        "micro_ready": "Micro: {name}",
+        "micro_missing": "Aucun micro",
+        "audio_ready": "Audio: {name}",
+        "audio_missing": "Audio indisponible",
+        "transcription_backend": "Transcription: {backend}",
+        "gpu_ready_title": "GPU détecté",
+        "gpu_ready_text": "GPU détecté",
+        "gpu_blocked_title": "GPU indisponible",
+        "gpu_blocked_text": "GPU non disponible",
+        "close_title": "Quitter Meet Transcript",
+        "close_recording": "Un enregistrement est en cours. Voulez-vous vraiment quitter ?",
+        "close_transcription": "Une transcription est en cours. Voulez-vous vraiment quitter ?",
+        "listen": "Écouter",
+        "rename": "Renommer",
+        "delete": "Supprimer",
+        "rename_title": "Renommer",
+        "recording_name": "Nom de l'enregistrement",
+        "audio_missing_title": "Audio introuvable",
+        "audio_missing_message": "Le fichier audio de cette session est introuvable.",
+        "delete_confirm": "Supprimer {title} ?",
+        "error": "Erreur",
+        "english": "Anglais",
+        "french": "Français",
+    },
+}
+
+
 class Badge(QWidget):
     def __init__(self, icon_name, text):
         super().__init__()
@@ -89,6 +219,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.storage = StorageService()
         self.settings = self.storage.load_settings()
+        self.ui_language = self.settings.get("interface_language", "en")
         self.storage.update_base_dir(self.settings.get("output_dir", self.storage.base_dir))
         self.recorder = AudioRecorder()
         self.transcription = TranscriptionService()
@@ -114,6 +245,11 @@ class MainWindow(QMainWindow):
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.tick)
 
+    def tr(self, key, **values):
+        language = self.settings.get("interface_language", self.ui_language)
+        text = TRANSLATIONS.get(language, TRANSLATIONS["en"]).get(key, TRANSLATIONS["en"].get(key, key))
+        return text.format(**values) if values else text
+
     def build_ui(self):
         root = QWidget()
         shell = QHBoxLayout(root)
@@ -128,8 +264,8 @@ class MainWindow(QMainWindow):
         brand.setPixmap(QIcon(str(asset_path("app-icon.svg"))).pixmap(22, 22))
         brand.setAlignment(Qt.AlignCenter)
         brand.setObjectName("brandIcon")
-        self.record_nav = self.nav_button("mic.svg", "Enregistrement", 0)
-        self.settings_nav = self.nav_button("settings.svg", "Paramètres", 1)
+        self.record_nav = self.nav_button("mic.svg", self.tr("recording"), 0)
+        self.settings_nav = self.nav_button("settings.svg", self.tr("settings"), 1)
         side.addWidget(brand)
         side.addSpacing(16)
         side.addWidget(self.record_nav, alignment=Qt.AlignCenter)
@@ -168,9 +304,9 @@ class MainWindow(QMainWindow):
         self.record_main_panel = QWidget()
         main = QVBoxLayout(self.record_main_panel)
         main.setSpacing(10)
-        header = QLabel("Enregistrement")
-        header.setObjectName("pageTitle")
-        self.status_label = QLabel("Prêt à enregistrer")
+        self.record_title = QLabel(self.tr("recording"))
+        self.record_title.setObjectName("pageTitle")
+        self.status_label = QLabel(self.tr("ready"))
         self.status_label.setObjectName("statusLabel")
         self.status_label.setProperty("state", "ready")
         self.transcription_progress = QProgressBar()
@@ -185,12 +321,11 @@ class MainWindow(QMainWindow):
         self.device_row.setContentsMargins(0, 0, 0, 0)
         self.device_row.setHorizontalSpacing(8)
         self.device_row.setVerticalSpacing(8)
-        self.micro_badge = Badge("mic.svg", "Micro: vérification")
-        self.system_badge = Badge("audio.svg", "Audio: vérification")
-        self.language_badge = Badge("language.svg", "Langue: Auto")
-        self.model_badge = Badge("model.svg", "Modèle: medium")
-        self.compute_badge = Badge("bolt.svg", "Transcription: vérification")
-        self.badges = (self.micro_badge, self.system_badge, self.language_badge, self.model_badge, self.compute_badge)
+        self.micro_badge = Badge("mic.svg", self.tr("micro_check"))
+        self.system_badge = Badge("audio.svg", self.tr("audio_check"))
+        self.model_badge = Badge("model.svg", self.tr("model_badge", model="medium"))
+        self.compute_badge = Badge("bolt.svg", self.tr("transcription_check"))
+        self.badges = (self.micro_badge, self.system_badge, self.model_badge, self.compute_badge)
         for badge in self.badges:
             badge.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
         self.arrange_badges(3)
@@ -204,7 +339,7 @@ class MainWindow(QMainWindow):
         controls_layout = QHBoxLayout(self.record_controls)
         controls_layout.setContentsMargins(0, 0, 0, 0)
         controls_layout.setSpacing(12)
-        self.start_button = QPushButton("Démarrer")
+        self.start_button = QPushButton(self.tr("start"))
         self.start_button.setObjectName("startButton")
         self.start_button.clicked.connect(self.toggle_recording)
         self.timer_label = QLabel("00:00")
@@ -216,7 +351,7 @@ class MainWindow(QMainWindow):
         self.waveform.setMaximumHeight(74)
         self.center_layout.addWidget(self.record_controls, 0, Qt.AlignVCenter)
         self.center_layout.addWidget(self.waveform, 1)
-        main.addWidget(header)
+        main.addWidget(self.record_title)
         main.addWidget(self.status_label)
         main.addWidget(self.transcription_progress)
         main.addWidget(self.badge_panel)
@@ -226,9 +361,9 @@ class MainWindow(QMainWindow):
         right_layout = QVBoxLayout(self.history_panel)
         right_layout.setContentsMargins(16, 16, 16, 16)
         right_layout.setSpacing(8)
-        right_title = QLabel("Sessions récentes")
-        right_title.setObjectName("sectionTitle")
-        self.recent_empty_label = QLabel("Aucune session enregistrée")
+        self.recent_title = QLabel(self.tr("recent_sessions"))
+        self.recent_title.setObjectName("sectionTitle")
+        self.recent_empty_label = QLabel(self.tr("empty_sessions"))
         self.recent_empty_label.setObjectName("emptyText")
         self.recent_empty_label.setAlignment(Qt.AlignCenter)
         self.recent_list = QListWidget()
@@ -243,20 +378,20 @@ class MainWindow(QMainWindow):
         transcript_layout.setSpacing(0)
         transcript_header = QHBoxLayout()
         transcript_header.setContentsMargins(12, 8, 12, 6)
-        transcript_title = QLabel("Transcript")
-        transcript_title.setObjectName("sectionTitle")
-        self.copy_button = self.svg_icon_button("copy.svg", "Copier")
+        self.transcript_title = QLabel(self.tr("transcript"))
+        self.transcript_title.setObjectName("sectionTitle")
+        self.copy_button = self.svg_icon_button("copy.svg", self.tr("copy"))
         self.copy_button.setProperty("normalIcon", "copy.svg")
         self.copy_button.setProperty("hoverIcon", "copy-hover.svg")
         self.copy_button.setEnabled(False)
         self.copy_button.clicked.connect(self.copy_transcript)
-        transcript_header.addWidget(transcript_title)
+        transcript_header.addWidget(self.transcript_title)
         transcript_header.addStretch()
         transcript_header.addWidget(self.copy_button)
         self.transcript_preview = QTextEdit()
         self.transcript_preview.setReadOnly(True)
         self.transcript_preview.setObjectName("transcriptPreview")
-        self.transcript_preview.setPlaceholderText("Sélectionnez une session pour afficher son transcript.")
+        self.transcript_preview.setPlaceholderText(self.tr("select_session"))
         transcript_layout.addLayout(transcript_header)
         transcript_layout.addWidget(self.transcript_preview)
         sessions_page = QWidget()
@@ -267,9 +402,9 @@ class MainWindow(QMainWindow):
         sessions_layout.addWidget(self.recent_list)
         self.history_tabs = QTabWidget()
         self.history_tabs.setObjectName("historyTabs")
-        self.history_tabs.addTab(sessions_page, "Sessions")
-        self.history_tabs.addTab(transcript_box, "Transcript")
-        right_layout.addWidget(right_title)
+        self.history_tabs.addTab(sessions_page, self.tr("sessions_tab"))
+        self.history_tabs.addTab(transcript_box, self.tr("transcript_tab"))
+        right_layout.addWidget(self.recent_title)
         right_layout.addWidget(self.history_tabs, 1)
         self.record_layout.addWidget(self.record_main_panel, 3)
         self.record_layout.addWidget(self.history_panel, 2)
@@ -280,7 +415,7 @@ class MainWindow(QMainWindow):
             self.device_row.addWidget(badge, index // columns, index % columns)
 
     def clear_badge_layout(self):
-        for badge in (self.micro_badge, self.system_badge, self.language_badge, self.model_badge, self.compute_badge):
+        for badge in (self.micro_badge, self.system_badge, self.model_badge, self.compute_badge):
             self.device_row.removeWidget(badge)
 
     def settings_page(self):
@@ -292,9 +427,9 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(page)
         layout.setContentsMargins(34, 30, 34, 30)
         layout.setSpacing(16)
-        title = QLabel("Paramètres")
-        title.setObjectName("pageTitle")
-        self.runtime_refresh_button = QPushButton("Vérifier GPU")
+        self.settings_title = QLabel(self.tr("settings"))
+        self.settings_title.setObjectName("pageTitle")
+        self.runtime_refresh_button = QPushButton(self.tr("verify_gpu"))
         self.runtime_refresh_button.clicked.connect(self.show_gpu_status)
         self.model_combo = self.combo(["small", "medium", "large-v3"])
         self.device_combo = QComboBox()
@@ -302,9 +437,9 @@ class MainWindow(QMainWindow):
         self.device_combo.addItem("CPU", "cpu")
         self.device_combo.currentIndexChanged.connect(self.on_device_changed)
         self.compute_combo = self.combo(["int8_float16", "float16", "int8"])
-        self.language_combo = QComboBox()
-        self.language_combo.setObjectName("languageCombo")
-        self.populate_language_combo()
+        self.interface_language_combo = QComboBox()
+        self.interface_language_combo.addItem(self.tr("english"), "en")
+        self.interface_language_combo.addItem(self.tr("french"), "fr")
         self.micro_combo = QComboBox()
         self.mic_gain_input = QDoubleSpinBox()
         self.mic_gain_input.setRange(0.5, 4.0)
@@ -330,38 +465,40 @@ class MainWindow(QMainWindow):
         mic_gain_layout.addWidget(self.mic_gain_plus)
         self.system_output_combo = QComboBox()
         self.output_dir_input = QLineEdit()
-        self.output_dir_button = QPushButton("Parcourir")
+        self.output_dir_button = QPushButton(self.tr("browse"))
         self.output_dir_button.clicked.connect(self.choose_output_dir)
-        transcription_section = self.section("Transcription", "bolt.svg")
+        self.form_labels = {}
+        self.section_labels = {}
+        transcription_section = self.section("transcription", "bolt.svg")
         transcription_layout = transcription_section.layout()
-        transcription_layout.addWidget(self.form_row("Modèle", self.model_combo))
-        transcription_layout.addWidget(self.form_row("Device", self.device_combo))
-        transcription_layout.addWidget(self.form_row("Compute", self.compute_combo))
+        transcription_layout.addWidget(self.form_row("model", self.model_combo))
+        transcription_layout.addWidget(self.form_row("device", self.device_combo))
+        transcription_layout.addWidget(self.form_row("compute", self.compute_combo))
         transcription_layout.addWidget(self.runtime_refresh_button)
-        audio_section = self.section("Audio", "audio.svg")
+        audio_section = self.section("audio", "audio.svg")
         audio_layout = audio_section.layout()
-        audio_layout.addWidget(self.form_row("Micro", self.micro_combo))
-        audio_layout.addWidget(self.form_row("Gain micro", mic_gain_control))
-        audio_layout.addWidget(self.form_row("Sortie audio système", self.system_output_combo))
-        language_section = self.section("Langues", "language.svg")
-        language_section.layout().addWidget(self.form_row("Détection", self.language_combo))
+        audio_layout.addWidget(self.form_row("microphone", self.micro_combo))
+        audio_layout.addWidget(self.form_row("mic_gain", mic_gain_control))
+        audio_layout.addWidget(self.form_row("system_output", self.system_output_combo))
+        interface_section = self.section("interface", "language.svg")
+        interface_section.layout().addWidget(self.form_row("interface_language", self.interface_language_combo))
         output_row = QWidget()
         output_layout = QHBoxLayout(output_row)
         output_layout.setContentsMargins(0, 0, 0, 0)
         output_layout.setSpacing(10)
         output_layout.addWidget(self.output_dir_input)
         output_layout.addWidget(self.output_dir_button)
-        storage_section = self.section("Stockage", "storage.svg")
-        storage_section.layout().addWidget(self.form_row("Dossier de sortie", output_row))
-        layout.addWidget(title)
+        storage_section = self.section("storage", "storage.svg")
+        storage_section.layout().addWidget(self.form_row("output_folder", output_row))
+        layout.addWidget(self.settings_title)
         layout.addWidget(transcription_section)
         layout.addWidget(audio_section)
-        layout.addWidget(language_section)
+        layout.addWidget(interface_section)
         layout.addWidget(storage_section)
         layout.addStretch()
         return scroll
 
-    def section(self, title, icon_name=None):
+    def section(self, title_key, icon_name=None):
         box = QFrame()
         box.setObjectName("settingsSection")
         layout = QVBoxLayout(box)
@@ -377,8 +514,9 @@ class MainWindow(QMainWindow):
             icon.setObjectName("sectionIcon")
             icon.setPixmap(QIcon(str(asset_path(icon_name))).pixmap(16, 16))
             header_layout.addWidget(icon, 0, Qt.AlignVCenter)
-        label = QLabel(title)
+        label = QLabel(self.tr(title_key))
         label.setObjectName("sectionTitle")
+        self.section_labels[title_key] = label
         header_layout.addWidget(label, 0, Qt.AlignVCenter)
         header_layout.addStretch()
         layout.addWidget(header)
@@ -502,15 +640,16 @@ class MainWindow(QMainWindow):
             if code != "auto":
                 self.language_combo.addItem(name, [code])
 
-    def form_row(self, label, widget):
+    def form_row(self, label_key, widget):
         row = QWidget()
         row.setObjectName("formRow")
         layout = QHBoxLayout(row)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(12)
-        name = QLabel(label)
+        name = QLabel(self.tr(label_key))
         name.setObjectName("formLabel")
         name.setWordWrap(True)
+        self.form_labels[label_key] = name
         layout.addWidget(name, 1)
         layout.addWidget(widget, 3)
         return row
@@ -541,7 +680,7 @@ class MainWindow(QMainWindow):
         self.set_combo_data(self.device_combo, self.settings.get("device", "cuda"))
         self.set_combo(self.compute_combo, self.settings.get("compute_type", "int8_float16"))
         self.mic_gain_input.setValue(float(self.settings.get("mic_gain", 1.8)))
-        self.set_selected_languages(self.settings.get("languages", ["auto"]))
+        self.set_combo_data(self.interface_language_combo, self.settings.get("interface_language", "en"))
         self.output_dir_input.setText(self.settings.get("output_dir", str(self.storage.base_dir)))
         self.refresh_device_choices()
         self.on_device_changed()
@@ -550,24 +689,27 @@ class MainWindow(QMainWindow):
         self.model_combo.currentIndexChanged.connect(self.auto_save_settings)
         self.device_combo.currentIndexChanged.connect(self.auto_save_settings)
         self.compute_combo.currentIndexChanged.connect(self.auto_save_settings)
-        self.language_combo.currentIndexChanged.connect(self.auto_save_settings)
-        self.language_combo.currentIndexChanged.connect(self.refresh_language_combo_style)
+        self.interface_language_combo.currentIndexChanged.connect(self.auto_save_settings)
         self.micro_combo.currentIndexChanged.connect(self.auto_save_settings)
         self.mic_gain_input.valueChanged.connect(self.auto_save_settings)
         self.system_output_combo.currentIndexChanged.connect(self.auto_save_settings)
         self.output_dir_input.editingFinished.connect(self.auto_save_settings)
 
     def refresh_device_choices(self):
+        self.micro_combo.blockSignals(True)
+        self.system_output_combo.blockSignals(True)
         self.micro_combo.clear()
         self.system_output_combo.clear()
-        self.micro_combo.addItem("Auto", "")
-        self.system_output_combo.addItem("Auto", "")
+        self.micro_combo.addItem(self.tr("auto"), "")
+        self.system_output_combo.addItem(self.tr("auto"), "")
         for name in self.recorder.list_microphones():
             self.micro_combo.addItem(name, name)
         for name in self.recorder.list_system_outputs():
             self.system_output_combo.addItem(name, name)
         self.set_combo_data(self.micro_combo, self.settings.get("microphone", ""))
         self.set_combo_data(self.system_output_combo, self.settings.get("system_output", ""))
+        self.micro_combo.blockSignals(False)
+        self.system_output_combo.blockSignals(False)
 
     def set_combo(self, combo, value):
         index = combo.findText(value)
@@ -579,28 +721,6 @@ class MainWindow(QMainWindow):
         if index >= 0:
             combo.setCurrentIndex(index)
 
-    def set_selected_languages(self, languages):
-        languages = languages or ["auto"]
-        normalized = sorted(languages)
-        self.language_combo.blockSignals(True)
-        target_index = 0
-        for index in range(self.language_combo.count()):
-            value = self.language_combo.itemData(index)
-            if sorted(value or []) == normalized:
-                target_index = index
-                break
-        self.language_combo.setCurrentIndex(target_index)
-        self.language_combo.blockSignals(False)
-        self.refresh_language_combo_style()
-
-    def selected_languages(self):
-        return self.language_combo.currentData() or ["auto"]
-
-    def refresh_language_combo_style(self):
-        self.language_combo.setProperty("selected", self.language_combo.currentData() != ["auto"])
-        self.language_combo.style().unpolish(self.language_combo)
-        self.language_combo.style().polish(self.language_combo)
-
     def on_device_changed(self):
         is_gpu = self.device_combo.currentData() == "cuda"
         if is_gpu:
@@ -610,20 +730,46 @@ class MainWindow(QMainWindow):
             self.set_combo(self.compute_combo, "int8")
         self.refresh_runtime_status()
 
+    def apply_translations(self):
+        self.record_nav.setToolTip(self.tr("recording"))
+        self.settings_nav.setToolTip(self.tr("settings"))
+        self.record_title.setText(self.tr("recording"))
+        self.settings_title.setText(self.tr("settings"))
+        if not self.recorder.running and not self.transcription_running:
+            self.status_label.setText(self.tr("ready"))
+            self.start_button.setText(self.tr("start"))
+        self.recent_title.setText(self.tr("recent_sessions"))
+        self.recent_empty_label.setText(self.tr("empty_sessions"))
+        self.transcript_title.setText(self.tr("transcript"))
+        self.copy_button.setToolTip(self.tr("copy"))
+        self.transcript_preview.setPlaceholderText(self.tr("select_session"))
+        self.history_tabs.setTabText(0, self.tr("sessions_tab"))
+        self.history_tabs.setTabText(1, self.tr("transcript_tab"))
+        self.runtime_refresh_button.setText(self.tr("verify_gpu"))
+        self.output_dir_button.setText(self.tr("browse"))
+        for key, label in self.section_labels.items():
+            label.setText(self.tr(key))
+        for key, label in self.form_labels.items():
+            label.setText(self.tr(key))
+        self.interface_language_combo.blockSignals(True)
+        self.interface_language_combo.setItemText(0, self.tr("english"))
+        self.interface_language_combo.setItemText(1, self.tr("french"))
+        self.interface_language_combo.blockSignals(False)
+        self.refresh_device_choices()
+
     def choose_output_dir(self):
-        selected = QFileDialog.getExistingDirectory(self, "Dossier de sortie", self.output_dir_input.text())
+        selected = QFileDialog.getExistingDirectory(self, self.tr("choose_output_folder"), self.output_dir_input.text())
         if selected:
             self.output_dir_input.setText(selected)
             self.auto_save_settings()
 
     def collect_settings(self):
-        languages = self.selected_languages() or ["auto"]
         return {
             "model": self.model_combo.currentText(),
             "device": self.device_combo.currentData() or "cuda",
             "compute_type": "int8" if self.device_combo.currentData() == "cpu" else self.compute_combo.currentText(),
             "require_gpu": self.device_combo.currentData() == "cuda",
-            "languages": languages,
+            "interface_language": self.interface_language_combo.currentData() or "en",
             "microphone": self.micro_combo.currentData() or "",
             "mic_gain": round(float(self.mic_gain_input.value()), 2),
             "system_output": self.system_output_combo.currentData() or "",
@@ -633,10 +779,13 @@ class MainWindow(QMainWindow):
     def auto_save_settings(self):
         if self.loading_settings:
             return
+        previous_language = self.settings.get("interface_language", "en")
         self.settings = self.collect_settings()
         self.storage.save_settings(self.settings)
         self.storage.update_base_dir(self.settings["output_dir"])
         self.transcription.configure(self.settings)
+        if previous_language != self.settings.get("interface_language", "en"):
+            self.apply_translations()
         self.refresh_devices()
         self.load_history()
 
@@ -645,18 +794,13 @@ class MainWindow(QMainWindow):
         self.recorder.mic_gain = float(self.settings.get("mic_gain", 1.8))
         self.recorder.system_output = self.settings.get("system_output", "")
         status = self.recorder.detect_devices()
-        self.micro_badge.setText(f"Micro: {status.microphone_name}" if status.microphone_available else "Aucun micro")
+        self.micro_badge.setText(self.tr("micro_ready", name=status.microphone_name) if status.microphone_available else self.tr("micro_missing"))
         self.micro_badge.setProperty("state", "neutral" if status.microphone_available else "blocked")
-        self.system_badge.setText(f"Audio: {status.system_name}" if status.system_audio_available else "Audio indisponible")
+        self.system_badge.setText(self.tr("audio_ready", name=status.system_name) if status.system_audio_available else self.tr("audio_missing"))
         self.system_badge.setProperty("state", "neutral" if status.system_audio_available else "blocked")
-        languages = self.settings.get("languages", ["auto"])
-        language_text = "Auto" if "auto" in languages else "/".join(language.upper() for language in languages)
-        self.language_badge.setText("Langue: " + language_text)
-        self.language_badge.setToolTip("Langues: " + language_text)
-        self.language_badge.setProperty("state", "neutral")
-        self.model_badge.setText(f"Modèle: {self.settings.get('model', 'medium')}")
+        self.model_badge.setText(self.tr("model_badge", model=self.settings.get("model", "medium")))
         self.model_badge.setProperty("state", "neutral")
-        for badge in (self.micro_badge, self.system_badge, self.language_badge, self.model_badge):
+        for badge in (self.micro_badge, self.system_badge, self.model_badge):
             badge.style().unpolish(badge)
             badge.style().polish(badge)
         self.refresh_runtime_status()
@@ -665,7 +809,7 @@ class MainWindow(QMainWindow):
         if hasattr(self, "model_combo"):
             self.transcription.configure(self.collect_settings())
         status = self.transcription.runtime_status()
-        self.compute_badge.setText(f"Transcription: {status.backend}")
+        self.compute_badge.setText(self.tr("transcription_backend", backend=status.backend))
         self.compute_badge.setProperty("state", "neutral" if status.backend == "GPU" else "blocked" if "bloque" in status.backend else "neutral")
         self.compute_badge.style().unpolish(self.compute_badge)
         self.compute_badge.style().polish(self.compute_badge)
@@ -676,14 +820,14 @@ class MainWindow(QMainWindow):
         box = QMessageBox(self)
         if status.backend == "GPU":
             box.setIcon(QMessageBox.Information)
-            box.setWindowTitle("GPU détecté")
-            box.setText("GPU détecté")
+            box.setWindowTitle(self.tr("gpu_ready_title"))
+            box.setText(self.tr("gpu_ready_text"))
             box.setInformativeText(status.message)
             box.setStyleSheet("QMessageBox { background: #101216; } QLabel { color: #62f0c8; } QPushButton { background: #143f35; color: #ffffff; padding: 8px 14px; border-radius: 8px; }")
         else:
             box.setIcon(QMessageBox.Critical)
-            box.setWindowTitle("GPU indisponible")
-            box.setText("GPU non disponible")
+            box.setWindowTitle(self.tr("gpu_blocked_title"))
+            box.setText(self.tr("gpu_blocked_text"))
             box.setInformativeText(status.message)
             box.setStyleSheet("QMessageBox { background: #101216; } QLabel { color: #ffb4a8; } QPushButton { background: #4a1d1d; color: #ffffff; padding: 8px 14px; border-radius: 8px; }")
         box.exec()
@@ -704,8 +848,8 @@ class MainWindow(QMainWindow):
             self.recorder.start(self.current_audio_path, self.settings)
             self.elapsed_seconds = 0
             self.timer.start(200)
-            self.start_button.setText("Arrêter")
-            self.status_label.setText("Enregistrement en cours ...")
+            self.start_button.setText(self.tr("stop"))
+            self.status_label.setText(self.tr("recording_active"))
             self.status_label.setProperty("state", "recording")
             self.status_label.style().unpolish(self.status_label)
             self.status_label.style().polish(self.status_label)
@@ -716,18 +860,18 @@ class MainWindow(QMainWindow):
             self.start_button.style().unpolish(self.start_button)
             self.start_button.style().polish(self.start_button)
         except Exception as exc:
-            QMessageBox.warning(self, "Enregistrement impossible", str(exc))
+            QMessageBox.warning(self, self.tr("record_impossible"), str(exc))
             self.refresh_devices()
 
     def stop_recording(self):
         self.timer.stop()
         self.start_button.setEnabled(False)
-        self.start_button.setText("Transcription")
+        self.start_button.setText(self.tr("transcribing"))
         self.start_button.setProperty("recording", False)
         self.start_button.style().unpolish(self.start_button)
         self.start_button.style().polish(self.start_button)
         status = self.refresh_runtime_status()
-        self.status_label.setText("Transcription en cours")
+        self.status_label.setText(self.tr("transcribing_status"))
         self.status_label.setProperty("state", "working")
         self.status_label.style().unpolish(self.status_label)
         self.status_label.style().polish(self.status_label)
@@ -751,13 +895,13 @@ class MainWindow(QMainWindow):
 
     def on_transcription_done(self, session):
         self.transcription_running = False
-        self.status_label.setText("Transcription terminée")
+        self.status_label.setText(self.tr("transcription_done"))
         self.status_label.setProperty("state", "done")
         self.status_label.style().unpolish(self.status_label)
         self.status_label.style().polish(self.status_label)
         self.transcription_progress.setVisible(False)
         self.transcription_progress.setValue(0)
-        self.start_button.setText("Démarrer")
+        self.start_button.setText(self.tr("start"))
         self.start_button.setProperty("recording", False)
         self.start_button.style().unpolish(self.start_button)
         self.start_button.style().polish(self.start_button)
@@ -768,7 +912,7 @@ class MainWindow(QMainWindow):
 
     def on_transcription_failed(self, message):
         self.transcription_running = False
-        self.status_label.setText("Erreur transcription")
+        self.status_label.setText(self.tr("transcription_error"))
         self.status_label.setProperty("state", "error")
         self.status_label.style().unpolish(self.status_label)
         self.status_label.style().polish(self.status_label)
@@ -776,12 +920,12 @@ class MainWindow(QMainWindow):
         self.transcription_progress.setFormat("%p%")
         self.transcription_progress.setVisible(False)
         self.transcription_progress.setValue(0)
-        self.start_button.setText("Démarrer")
+        self.start_button.setText(self.tr("start"))
         self.start_button.setProperty("recording", False)
         self.start_button.style().unpolish(self.start_button)
         self.start_button.style().polish(self.start_button)
         self.start_button.setEnabled(True)
-        QMessageBox.critical(self, "Erreur", message)
+        QMessageBox.critical(self, self.tr("error"), message)
 
     def on_transcription_progress(self, value):
         self.transcription_progress.setVisible(True)
@@ -793,8 +937,8 @@ class MainWindow(QMainWindow):
         if not self.recorder.running and not self.transcription_running:
             event.accept()
             return
-        message = "Un enregistrement est en cours. Voulez-vous vraiment quitter ?" if self.recorder.running else "Une transcription est en cours. Voulez-vous vraiment quitter ?"
-        answer = QMessageBox.question(self, "Quitter Meet Transcript", message, QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        message = self.tr("close_recording") if self.recorder.running else self.tr("close_transcription")
+        answer = QMessageBox.question(self, self.tr("close_title"), message, QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         if answer == QMessageBox.Yes:
             if self.recorder.running:
                 self.recorder.stop()
@@ -853,9 +997,9 @@ class MainWindow(QMainWindow):
         meta_layout.addStretch()
         content_layout.addWidget(label)
         content_layout.addWidget(meta)
-        play_button = self.svg_icon_button("play.svg", "Écouter")
-        rename_button = self.svg_icon_button("edit.svg", "Renommer")
-        delete_button = self.svg_icon_button("trash.svg", "Supprimer")
+        play_button = self.svg_icon_button("play.svg", self.tr("listen"))
+        rename_button = self.svg_icon_button("edit.svg", self.tr("rename"))
+        delete_button = self.svg_icon_button("trash.svg", self.tr("delete"))
         play_button.setProperty("role", "action")
         rename_button.setProperty("role", "action")
         delete_button.setProperty("role", "delete")
@@ -923,7 +1067,7 @@ class MainWindow(QMainWindow):
         session = next((item for item in self.sessions if item.id == session_id), None)
         if not session:
             return
-        title, ok = QInputDialog.getText(self, "Renommer", "Nom de l'enregistrement", text=session.title)
+        title, ok = QInputDialog.getText(self, self.tr("rename_title"), self.tr("recording_name"), text=session.title)
         title = title.strip()
         if ok and title:
             self.storage.rename_session(session.id, title)
@@ -935,7 +1079,7 @@ class MainWindow(QMainWindow):
         if not session:
             return
         if not session.audio_path.exists():
-            QMessageBox.warning(self, "Audio introuvable", "Le fichier audio de cette session est introuvable.")
+            QMessageBox.warning(self, self.tr("audio_missing_title"), self.tr("audio_missing_message"))
             return
         os.startfile(session.audio_path)
 
@@ -943,7 +1087,7 @@ class MainWindow(QMainWindow):
         session = next((item for item in self.sessions if item.id == session_id), None)
         if not session:
             return
-        answer = QMessageBox.question(self, "Supprimer", f"Supprimer {session.title} ?")
+        answer = QMessageBox.question(self, self.tr("delete"), self.tr("delete_confirm", title=session.title))
         if answer == QMessageBox.Yes:
             self.storage.delete_session(session.id)
             self.load_history()
@@ -1067,7 +1211,6 @@ class MainWindow(QMainWindow):
             #startButton:disabled { background: #41505a; color: #aab4bc; }
             #timerLabel { font-size: 21pt; font-weight: 700; color: #ffffff; }
             QListWidget, QTextEdit, QComboBox, QLineEdit, QDoubleSpinBox { background: #101216; border: 1px solid #2a313b; border-radius: 8px; padding: 8px; color: #edf2f6; selection-background-color: #143f35; }
-            #languageCombo[selected="true"] { color: #62f0c8; border: 1px solid #14b8a6; background: #101216; }
             #transcriptPreview { border: 0; border-top: 1px solid #2a313b; border-radius: 0; }
             QListWidget::item { padding: 0; border-radius: 7px; background: transparent; margin: 0; min-height: 42px; }
             QListWidget::item:selected { background: transparent; }
