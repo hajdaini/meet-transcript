@@ -1,5 +1,11 @@
 # Meet Transcript
 
+[![Latest Release](https://img.shields.io/github/v/release/hajdaini/meet-transcript?label=latest%20release)](https://github.com/hajdaini/meet-transcript/releases/latest)
+[![Windows Download](https://img.shields.io/badge/download-Windows%20latest-14b8a6)](https://github.com/hajdaini/meet-transcript/releases/latest/download/MeetTranscript-Windows-latest.zip)
+[![Release Workflow](https://github.com/hajdaini/meet-transcript/actions/workflows/release.yml/badge.svg)](https://github.com/hajdaini/meet-transcript/actions/workflows/release.yml)
+![Python](https://img.shields.io/badge/python-3.11-blue)
+![Platform](https://img.shields.io/badge/platform-Windows-lightgrey)
+
 Meet Transcript is a Windows desktop app built with Python and PySide6. It records microphone audio and Windows system audio, then generates local meeting transcripts with faster-whisper.
 
 ![Meet Transcript screenshot](docs/app-screenshot.png)
