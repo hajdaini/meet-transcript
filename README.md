@@ -25,7 +25,14 @@ Meet Transcript is a Windows desktop app built with Python and PySide6. It recor
 - Configurable output folder
 - Microphone gain calibration, default `1.8x`
 
-## Quick Start
+## Run The App
+
+You can run Meet Transcript in two ways:
+
+- from source with the local Python environment
+- from the Windows release executable
+
+## From Source
 
 Create the local virtual environment:
 
@@ -47,7 +54,7 @@ Run the app:
 
 `run.ps1` prepares CUDA/cuDNN DLL paths and starts the app. Model, device, language, microphone, gain, and output settings are managed directly inside the UI.
 
-## Windows Release
+## From Windows Release
 
 The repository includes a GitHub Actions workflow at `.github/workflows/release.yml`.
 

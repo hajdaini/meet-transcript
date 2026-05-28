@@ -33,7 +33,7 @@ jobs:
       - name: Build executable
         shell: pwsh
         run: |
-          pyinstaller --noconfirm --clean --windowed --name MeetTranscript --add-data "assets;assets" --collect-all faster_whisper --collect-all ctranslate2 --collect-all tokenizers --collect-all av main.py
+          pyinstaller --noconfirm --clean --windowed --name MeetTranscript --icon "assets\app-icon.ico" --add-data "assets;assets" --collect-all faster_whisper --collect-all ctranslate2 --collect-all tokenizers --collect-all av main.py
 
       - name: Package release
         shell: pwsh
