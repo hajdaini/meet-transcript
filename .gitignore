@@ -1,0 +1,6 @@
+.venv/
+transcripts/
+AGENTS.md
+settings.json
+__pycache__/
+*.pyc
