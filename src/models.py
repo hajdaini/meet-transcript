@@ -12,4 +12,4 @@ class Session:
     audio_path: Path
     transcript_path: Path
     transcript: str
-    language: str
+    language: str = "auto"
