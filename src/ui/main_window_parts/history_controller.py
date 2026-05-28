@@ -1,4 +1,4 @@
-import os
+import re
 from pathlib import Path
 
 from PySide6.QtCore import Qt
@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QMessageBox,
     QPushButton,
+    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
@@ -75,15 +76,21 @@ class MainWindowHistoryMixin:
         date_text = session.created_at.strftime("%d/%m/%Y %H:%M")
         content = QWidget()
         content.setObjectName("sessionContent")
+        content.setMinimumWidth(0)
+        content.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
         content_layout = QVBoxLayout(content)
         content_layout.setContentsMargins(0, 0, 0, 0)
         content_layout.setSpacing(2)
         label = QPushButton(session.title)
         label.setObjectName("sessionButton")
+        label.setMinimumWidth(0)
+        label.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
         label.setCursor(Qt.PointingHandCursor)
         label.clicked.connect(lambda: self.select_session(session.id))
         meta = QWidget()
         meta.setObjectName("sessionMeta")
+        meta.setMinimumWidth(0)
+        meta.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
         meta_layout = QHBoxLayout(meta)
         meta_layout.setContentsMargins(5, 0, 0, 0)
         meta_layout.setSpacing(5)
@@ -115,6 +122,10 @@ class MainWindowHistoryMixin:
         rename_button.setProperty("hoverIcon", "edit-hover.svg")
         delete_button.setProperty("normalIcon", "trash.svg")
         delete_button.setProperty("hoverIcon", "trash-hover.svg")
+        for button in (play_button, rename_button, delete_button):
+            button.setFixedSize(28, 28)
+            button.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+
         play_button.clicked.connect(lambda: self.play_session(session.id))
         rename_button.clicked.connect(lambda: self.rename_session(session.id))
         delete_button.clicked.connect(lambda: self.delete_session(session.id))
@@ -123,6 +134,7 @@ class MainWindowHistoryMixin:
         layout.addWidget(play_button, 0, Qt.AlignVCenter)
         layout.addWidget(rename_button, 0, Qt.AlignVCenter)
         layout.addWidget(delete_button, 0, Qt.AlignVCenter)
+        row.setMinimumWidth(0)
         row.setMinimumHeight(54)
         return row
 
@@ -153,7 +165,21 @@ class MainWindowHistoryMixin:
         self.transcript_preview.setPlainText(session.transcript if session else "")
         self.copy_button.setEnabled(has_transcript)
         self.export_button.setEnabled(has_transcript)
+        self.update_transcript_stats(session)
+        self.load_audio_player_session(session)
         self.update_session_selection_styles()
+
+    def update_transcript_stats(self, session):
+        if not hasattr(self, "transcript_words_label"):
+            return
+        text = session.transcript if session else ""
+        clean_text = re.sub(r"\[[0-9:.]+\]", " ", text or "")
+        words = re.findall(r"[A-Za-zÀ-ÿ0-9]+(?:[-'][A-Za-zÀ-ÿ0-9]+)?", clean_text, flags=re.UNICODE)
+        word_count = len(words)
+        duration_seconds = int(session.duration_seconds) if session else 0
+        wpm = int(round((word_count / duration_seconds) * 60)) if duration_seconds > 0 and word_count else 0
+        self.transcript_words_label.setText(f"✦ {word_count} {self.tr('words_count')}")
+        self.transcript_wpm_label.setText(f"↗ {wpm} WPM")
 
     def update_session_selection_styles(self):
         current = self.recent_list.currentItem()
@@ -206,13 +232,8 @@ class MainWindowHistoryMixin:
             self.load_history()
 
     def play_session(self, session_id):
-        session = next((item for item in self.sessions if item.id == session_id), None)
-        if not session:
-            return
-        if not session.audio_path.exists():
-            QMessageBox.warning(self, self.tr("audio_missing_title"), self.tr("audio_missing_message"))
-            return
-        os.startfile(session.audio_path)
+        self.select_session(session_id)
+        self.play_selected_audio()
 
     def delete_session(self, session_id):
         session = next((item for item in self.sessions if item.id == session_id), None)
@@ -225,4 +246,7 @@ class MainWindowHistoryMixin:
             self.transcript_preview.clear()
             self.copy_button.setEnabled(False)
             self.export_button.setEnabled(False)
+            self.update_transcript_stats(None)
+            self.stop_audio_player()
+            self.reset_audio_player_ui()
 

@@ -16,6 +16,8 @@ class AudioDeviceStatus:
 
 
 class AudioRecorder:
+    MIC_DISABLED = "__none__"
+
     def __init__(self, sample_rate=44100, channels=1):
         self.sample_rate = sample_rate
         self.channels = channels
@@ -52,14 +54,20 @@ class AudioRecorder:
         system_audio_available = False
         microphone_name = ""
         system_name = ""
-        try:
-            import sounddevice as sd
 
-            device = self.selected_microphone_device(sd)
-            microphone_available = bool(device)
-            microphone_name = device.get("name", "") if isinstance(device, dict) else ""
-        except Exception:
-            microphone_available = False
+        if self.microphone == self.MIC_DISABLED:
+            microphone_available = True
+            microphone_name = "disabled"
+        else:
+            try:
+                import sounddevice as sd
+
+                device = self.selected_microphone_device(sd)
+                microphone_available = bool(device)
+                microphone_name = device.get("name", "") if isinstance(device, dict) else ""
+            except Exception:
+                microphone_available = False
+
         try:
             import soundcard as sc
 
@@ -68,6 +76,7 @@ class AudioRecorder:
             system_name = speaker.name if speaker else ""
         except Exception:
             system_audio_available = False
+
         return AudioDeviceStatus(microphone_available, system_audio_available, microphone_name, system_name)
 
     def start(self, output_path: Path, settings=None):
@@ -75,9 +84,15 @@ class AudioRecorder:
         self.microphone = settings.get("microphone", "")
         self.mic_gain = float(settings.get("mic_gain", 1.8) or 1.8)
         self.system_output = settings.get("system_output", "")
+
         status = self.detect_devices()
-        if not status.microphone_available:
+
+        if self.microphone == self.MIC_DISABLED:
+            if not status.system_audio_available:
+                raise RuntimeError("Aucune sortie audio système détectée.")
+        elif not status.microphone_available:
             raise RuntimeError("Aucun micro detecte.")
+
         self.output_path = Path(output_path)
         self.frames = []
         self.running = True
@@ -96,15 +111,39 @@ class AudioRecorder:
 
     def record_loop(self):
         try:
-            self.record_micro_and_system()
+            if self.microphone == self.MIC_DISABLED:
+                self.record_system_only()
+            else:
+                self.record_micro_and_system()
         except Exception:
+            if self.microphone == self.MIC_DISABLED:
+                raise
             self.record_micro_only()
+
+    def record_system_only(self):
+        import soundcard as sc
+
+        speaker = self.selected_speaker(sc)
+        if speaker is None:
+            raise RuntimeError("Aucune sortie audio système détectée.")
+
+        with sc.get_microphone(id=str(speaker.name), include_loopback=True).recorder(samplerate=self.sample_rate, channels=self.channels) as recorder:
+            while self.running:
+                chunk = recorder.record(numframes=1024)
+                chunk = np.asarray(chunk, dtype=np.float32)
+                chunk = np.clip(chunk * self.system_gain, -1, 1)
+                self.frames.append(chunk)
+                self.last_level = self.audio_level(chunk)
 
     def record_micro_and_system(self):
         import soundcard as sc
         import sounddevice as sd
 
         speaker = self.selected_speaker(sc)
+        if speaker is None:
+            self.record_micro_only()
+            return
+
         mic_queue = queue.Queue(maxsize=32)
 
         def callback(indata, frames, time_info, status):
@@ -142,6 +181,8 @@ class AudioRecorder:
                 time.sleep(0.05)
 
     def selected_microphone_device(self, sd):
+        if self.microphone == self.MIC_DISABLED:
+            return None
         if not self.microphone:
             return sd.query_devices(kind="input")
         devices = sd.query_devices()
@@ -151,6 +192,8 @@ class AudioRecorder:
         return None
 
     def selected_microphone_index(self, sd):
+        if self.microphone == self.MIC_DISABLED:
+            return None
         if not self.microphone:
             return None
         devices = sd.query_devices()

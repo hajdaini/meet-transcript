@@ -3,6 +3,7 @@ import sys
 from pathlib import Path
 
 from src.resources import app_root
+from src.services.transcript_formatter import SmartTranscriptFormatter
 
 
 class ProgressTqdm:
@@ -73,9 +74,9 @@ class MockTranscriptionProvider:
     def transcribe(self, audio_path: Path, progress_callback=None):
         name = Path(audio_path).name
         text = (
-            "Transcript de demonstration.\n\n"
-            f"Audio source: {name}\n\n"
-            "Whisper local est pret a etre branche avec faster-whisper. "
+            "[00:00] Transcript de demonstration.\n\n"
+            f"[00:05] Audio source: {name}\n\n"
+            "[00:10] Whisper local est pret a etre branche avec faster-whisper. "
             "La detection automatique utilisera language=None."
         )
         if progress_callback:
@@ -93,6 +94,7 @@ class FasterWhisperProvider:
         self.compute_type = settings.get("compute_type") or os.getenv("MEET_TRANSCRIPT_COMPUTE_TYPE", "int8_float16")
         self.require_gpu = bool(settings.get("require_gpu", os.getenv("MEET_TRANSCRIPT_REQUIRE_GPU", "1") == "1"))
         self.progress_chunk_seconds = int(settings.get("progress_chunk_seconds", 5) or 5)
+        self.formatter = SmartTranscriptFormatter.from_settings(settings)
         self.WhisperModel = WhisperModel
         if self.require_gpu and self.device != "cuda":
             raise GpuRequiredError("GPU required: MEET_TRANSCRIPT_DEVICE must be cuda.")
@@ -142,20 +144,18 @@ class FasterWhisperProvider:
                 segments, info = self.model.transcribe(str(audio_path), language=None, vad_filter=True, log_progress=bool(progress_callback), chunk_length=self.chunk_length(progress_callback))
             else:
                 raise
-        parts = []
-        self.consume_segments(segments, parts, progress_callback)
+        collected_segments = self.consume_segments(segments, progress_callback)
         if progress_callback:
             progress_callback(100)
-        text = "\n".join(parts)
-        return TranscriptionResult(text=text or "Aucun texte detecte.", language=info.language or "auto")
+        text = self.formatter.format(collected_segments)
+        return TranscriptionResult(text=text, language=info.language or "auto")
 
-    def consume_segments(self, segments, parts, progress_callback):
+    def consume_segments(self, segments, progress_callback):
+        collected = []
         if not progress_callback:
             for segment in segments:
-                content = segment.text.strip()
-                if content:
-                    parts.append(content)
-            return
+                collected.append(segment)
+            return collected
         import faster_whisper.transcribe as transcribe_module
 
         original_tqdm = transcribe_module.tqdm
@@ -166,11 +166,10 @@ class FasterWhisperProvider:
         transcribe_module.tqdm = factory
         try:
             for segment in segments:
-                content = segment.text.strip()
-                if content:
-                    parts.append(content)
+                collected.append(segment)
         finally:
             transcribe_module.tqdm = original_tqdm
+        return collected
 
     def chunk_length(self, progress_callback):
         if progress_callback:

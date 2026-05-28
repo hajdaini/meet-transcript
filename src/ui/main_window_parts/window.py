@@ -1,6 +1,6 @@
 from PySide6.QtCore import QTimer
 from PySide6.QtGui import QIcon
-from PySide6.QtWidgets import QMainWindow
+from PySide6.QtWidgets import QMainWindow, QSystemTrayIcon
 
 from src.resources import asset_path
 from src.services.audio import AudioRecorder
@@ -8,6 +8,7 @@ from src.services.audio_importer import AudioImportService
 from src.services.storage import StorageService
 from src.services.transcription import TranscriptionService
 
+from .audio_player import MainWindowAudioPlayerMixin
 from .history_controller import MainWindowHistoryMixin
 from .recording_controller import MainWindowRecordingMixin
 from .responsive import MainWindowResponsiveMixin
@@ -21,6 +22,7 @@ class MainWindow(
     MainWindowUiBuilderMixin,
     MainWindowSettingsMixin,
     MainWindowRecordingMixin,
+    MainWindowAudioPlayerMixin,
     MainWindowHistoryMixin,
     MainWindowResponsiveMixin,
     MainWindowStyleMixin,
@@ -46,9 +48,12 @@ class MainWindow(
         self.transcription_running = False
         self.setWindowTitle("Meet Transcript")
         self.setWindowIcon(QIcon(str(asset_path("app-icon.svg"))))
-        self.setMinimumSize(760, 620)
+        self.setup_notifications()
+        self.setMinimumSize(480, 670)
+        self.resize(960, 810)
         self.setAcceptDrops(True)
         self.build_ui()
+        self.setup_audio_player()
         self.apply_style()
         self.load_settings_to_ui()
         self.bind_auto_save()
@@ -63,3 +68,11 @@ class MainWindow(
         text = TRANSLATIONS.get(language, TRANSLATIONS["en"]).get(key, TRANSLATIONS["en"].get(key, key))
         return text.format(**values) if values else text
 
+    def setup_notifications(self):
+        self.tray_icon = QSystemTrayIcon(QIcon(str(asset_path("app-icon.svg"))), self)
+        self.tray_icon.setToolTip("Meet Transcript")
+        self.tray_icon.show()
+
+    def notify_user(self, title, message, icon=QSystemTrayIcon.Information):
+        if hasattr(self, "tray_icon") and QSystemTrayIcon.isSystemTrayAvailable():
+            self.tray_icon.showMessage(title, message, icon, 4000)

@@ -145,6 +145,7 @@ class MainWindowRecordingMixin:
         self.timer_label.setText("00:00")
         self.load_history()
         self.select_session(session.id)
+        self.notify_user(self.tr("transcription_done"), session.title)
 
     def on_transcription_failed(self, message):
         self.transcription_running = False
@@ -163,6 +164,7 @@ class MainWindowRecordingMixin:
         self.start_button.style().polish(self.start_button)
         self.start_button.setEnabled(True)
         self.import_button.setEnabled(True)
+        self.notify_user(self.tr("transcription_error"), message)
         QMessageBox.critical(self, self.tr("error"), message)
 
     def on_transcription_progress(self, value):
@@ -173,6 +175,7 @@ class MainWindowRecordingMixin:
 
     def closeEvent(self, event):
         if not self.recorder.running and not self.transcription_running:
+            self.stop_audio_player()
             event.accept()
             return
         message = self.tr("close_recording") if self.recorder.running else self.tr("close_transcription")
@@ -180,6 +183,7 @@ class MainWindowRecordingMixin:
         if answer == QMessageBox.Yes:
             if self.recorder.running:
                 self.recorder.stop()
+            self.stop_audio_player()
             event.accept()
         else:
             event.ignore()

@@ -6,7 +6,7 @@ from PySide6.QtWidgets import QWidget
 class WaveformWidget(QWidget):
     def __init__(self):
         super().__init__()
-        self.values = [0.05] * 56
+        self.values = [0.05] * 72
         self.setMinimumHeight(82)
         self.setMaximumHeight(96)
         self.timer = QTimer(self)
@@ -15,26 +15,26 @@ class WaveformWidget(QWidget):
 
     def set_level(self, level):
         self.values.append(max(0.06, min(1.0, level)))
-        self.values = self.values[-56:]
+        self.values = self.values[-72:]
 
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
         width = self.width()
         height = self.height()
-        gap = 5
-        padding = 10
+        gap = 3
+        padding = 8
         usable_width = max(1, width - padding * 2)
-        visible_count = max(8, min(len(self.values), int(usable_width / 10)))
+        visible_count = max(10, min(len(self.values), int(usable_width / 7)))
         values = self.values[-visible_count:]
-        bar_width = max(4, min(7, int((usable_width - gap * max(0, len(values) - 1)) / len(values))))
+        bar_width = max(2, min(4, int((usable_width - gap * max(0, len(values) - 1)) / len(values))))
         x = padding
         pen = QPen(QColor("#14b8a6"))
         pen.setWidth(bar_width)
         pen.setCapStyle(Qt.RoundCap)
         painter.setPen(pen)
         for value in values:
-            bar_height = max(16, int(value * (height - 8)))
+            bar_height = max(12, int(value * (height - 10)))
             y1 = int((height - bar_height) / 2)
             y2 = y1 + bar_height
             painter.drawLine(x, y1, x, y2)

@@ -5,6 +5,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from src.models import Session
+from src.services.title_generator import TitleGenerator
 
 
 class StorageService:
@@ -14,6 +15,7 @@ class StorageService:
         self.text_dir = self.base_dir / "text"
         self.history_path = self.base_dir / "history.json"
         self.settings_path = Path.cwd() / "settings.json"
+        self.title_generator = TitleGenerator()
         self.audio_dir.mkdir(parents=True, exist_ok=True)
         self.text_dir.mkdir(parents=True, exist_ok=True)
         if not self.history_path.exists():
@@ -40,7 +42,7 @@ class StorageService:
 
     def save_session(self, session_id, audio_path, transcript, duration_seconds, language):
         transcript_path = self.text_dir / f"{session_id}.txt"
-        title = self.next_session_title()
+        title = self.generate_session_title(transcript, language)
         transcript_path.write_text(transcript, encoding="utf-8")
         session = Session(
             id=session_id,
@@ -56,6 +58,21 @@ class StorageService:
         items.insert(0, self.to_dict(session))
         self.history_path.write_text(json.dumps(items, indent=2, ensure_ascii=False), encoding="utf-8")
         return session
+
+    def generate_session_title(self, transcript, language):
+        fallback = self.next_session_title()
+        title = self.title_generator.generate(transcript, language=language, fallback_title=fallback)
+        title = self.unique_session_title(title or fallback)
+        return title
+
+    def unique_session_title(self, title):
+        existing = {item.get("title", "") for item in self.load_raw()}
+        if title not in existing:
+            return title
+        index = 2
+        while f"{title} ({index})" in existing:
+            index += 1
+        return f"{title} ({index})"
 
     def next_session_title(self):
         highest = 0
@@ -99,6 +116,9 @@ class StorageService:
             "require_gpu": True,
             "interface_language": "en",
             "progress_chunk_seconds": 5,
+            "transcript_max_pause_seconds": 1.5,
+            "transcript_max_block_seconds": 45,
+            "transcript_max_block_words": 90,
             "microphone": "",
             "mic_gain": 1.8,
             "system_output": "",

@@ -122,6 +122,9 @@ class MainWindowSettingsMixin:
         self.set_combo_data(self.device_combo, self.settings.get("device", "cuda"))
         self.set_combo(self.compute_combo, self.settings.get("compute_type", "int8_float16"))
         self.mic_gain_input.setValue(float(self.settings.get("mic_gain", 1.8)))
+        self.transcript_pause_input.setValue(float(self.settings.get("transcript_max_pause_seconds", 1.8)))
+        self.transcript_block_seconds_input.setValue(int(self.settings.get("transcript_max_block_seconds", 45)))
+        self.transcript_block_words_input.setValue(int(self.settings.get("transcript_max_block_words", 90)))
         self.set_combo_data(self.interface_language_combo, self.settings.get("interface_language", "en"))
         self.output_dir_input.setText(self.settings.get("output_dir", str(self.storage.base_dir)))
         self.refresh_device_choices()
@@ -134,6 +137,9 @@ class MainWindowSettingsMixin:
         self.interface_language_combo.currentIndexChanged.connect(self.auto_save_settings)
         self.micro_combo.currentIndexChanged.connect(self.auto_save_settings)
         self.mic_gain_input.valueChanged.connect(self.auto_save_settings)
+        self.transcript_pause_input.valueChanged.connect(self.auto_save_settings)
+        self.transcript_block_seconds_input.valueChanged.connect(self.auto_save_settings)
+        self.transcript_block_words_input.valueChanged.connect(self.auto_save_settings)
         self.system_output_combo.currentIndexChanged.connect(self.auto_save_settings)
         self.output_dir_input.editingFinished.connect(self.auto_save_settings)
 
@@ -143,6 +149,7 @@ class MainWindowSettingsMixin:
         self.micro_combo.clear()
         self.system_output_combo.clear()
         self.micro_combo.addItem(self.tr("auto"), "")
+        self.micro_combo.addItem(self.tr("no_microphone"), "__none__")
         self.system_output_combo.addItem(self.tr("auto"), "")
         for name in self.recorder.list_microphones():
             self.micro_combo.addItem(name, name)
@@ -182,12 +189,14 @@ class MainWindowSettingsMixin:
             self.start_button.setText(self.tr("start"))
         self.import_button.setText(self.tr("import_audio"))
         self.recent_title.setText(self.tr("recent_sessions"))
-        self.session_search_input.setPlaceholderText(self.tr("search_sessions"))
+        self.session_search_input.setPlaceholderText("🔎  " + self.tr("search_sessions"))
         self.recent_empty_label.setText(self.tr("empty_sessions"))
         self.transcript_title.setText(self.tr("transcript"))
         self.copy_button.setToolTip(self.tr("copy"))
         self.export_button.setToolTip(self.tr("export"))
+        self.audio_play_button.setToolTip(self.tr("play_audio"))
         self.transcript_preview.setPlaceholderText(self.tr("select_session"))
+        self.update_transcript_stats(self.selected_session())
         self.history_tabs.setTabText(0, self.tr("sessions_tab"))
         self.history_tabs.setTabText(1, self.tr("transcript_tab"))
         self.runtime_refresh_button.setText(self.tr("verify_gpu"))
@@ -218,6 +227,9 @@ class MainWindowSettingsMixin:
             "microphone": self.micro_combo.currentData() or "",
             "mic_gain": round(float(self.mic_gain_input.value()), 2),
             "system_output": self.system_output_combo.currentData() or "",
+            "transcript_max_pause_seconds": round(float(self.transcript_pause_input.value()), 1),
+            "transcript_max_block_seconds": int(self.transcript_block_seconds_input.value()),
+            "transcript_max_block_words": int(self.transcript_block_words_input.value()),
             "output_dir": self.output_dir_input.text().strip() or str(Path.cwd() / "transcripts"),
         }
 
@@ -239,8 +251,12 @@ class MainWindowSettingsMixin:
         self.recorder.mic_gain = float(self.settings.get("mic_gain", 1.8))
         self.recorder.system_output = self.settings.get("system_output", "")
         status = self.recorder.detect_devices()
-        self.micro_badge.setText(self.tr("micro_ready", name=status.microphone_name) if status.microphone_available else self.tr("micro_missing"))
-        self.micro_badge.setProperty("state", "neutral" if status.microphone_available else "blocked")
+        if self.recorder.microphone == "__none__":
+            self.micro_badge.setText(self.tr("micro_disabled"))
+            self.micro_badge.setProperty("state", "neutral")
+        else:
+            self.micro_badge.setText(self.tr("micro_ready", name=status.microphone_name) if status.microphone_available else self.tr("micro_missing"))
+            self.micro_badge.setProperty("state", "neutral" if status.microphone_available else "blocked")
         self.system_badge.setText(self.tr("audio_ready", name=status.system_name) if status.system_audio_available else self.tr("audio_missing"))
         self.system_badge.setProperty("state", "neutral" if status.system_audio_available else "blocked")
         self.model_badge.setText(self.tr("model_badge", model=self.settings.get("model", "medium")))

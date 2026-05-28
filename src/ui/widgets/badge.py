@@ -1,6 +1,6 @@
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QIcon
-from PySide6.QtWidgets import QHBoxLayout, QLabel, QWidget
+from PySide6.QtWidgets import QHBoxLayout, QLabel, QSizePolicy, QWidget
 
 from src.resources import asset_path
 
@@ -18,6 +18,8 @@ class Badge(QWidget):
         self.label = QLabel(text)
         self.label.setObjectName("badgeText")
         self.label.setWordWrap(False)
+        self.label.setMinimumWidth(0)
+        self.label.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
         layout.addWidget(self.icon, 0, Qt.AlignVCenter)
         layout.addWidget(self.label, 1, Qt.AlignVCenter)
 
