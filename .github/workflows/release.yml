@@ -35,6 +35,21 @@ jobs:
         run: |
           pyinstaller --noconfirm --clean --windowed --name MeetTranscript --icon "assets\app-icon.ico" --add-data "assets;assets" --collect-all faster_whisper --collect-all ctranslate2 --collect-all tokenizers --collect-all av main.py
 
+      - name: Verify bundled assets
+        shell: pwsh
+        run: |
+          $assetDir = "dist\MeetTranscript\_internal\assets"
+          if (!(Test-Path $assetDir)) {
+            Write-Error "Missing bundled assets directory: $assetDir"
+          }
+          $required = @("app-icon.svg", "mic.svg", "settings.svg", "start.svg", "import.svg", "play.svg", "copy.svg", "export.svg")
+          foreach ($name in $required) {
+            $path = Join-Path $assetDir $name
+            if (!(Test-Path $path)) {
+              Write-Error "Missing bundled asset: $path"
+            }
+          }
+
       - name: Package release
         shell: pwsh
         run: |

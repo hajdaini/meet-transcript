@@ -8,5 +8,26 @@ def app_root():
     return Path(__file__).resolve().parent.parent
 
 
+def resource_root():
+    if getattr(sys, "frozen", False):
+        meipass = getattr(sys, "_MEIPASS", None)
+        if meipass:
+            return Path(meipass)
+        root = app_root()
+        internal = root / "_internal"
+        if internal.exists():
+            return internal
+        return root
+    return app_root()
+
+
 def asset_path(name):
-    return app_root() / "assets" / name
+    candidates = [
+        resource_root() / "assets" / name,
+        app_root() / "assets" / name,
+        app_root() / "_internal" / "assets" / name,
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return candidates[0]
