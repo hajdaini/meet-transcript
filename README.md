@@ -128,7 +128,7 @@ microphone: Auto
 microphone gain: 1.8x
 system output: Auto
 output directory: transcripts/
-smart section pause threshold: 1.8s
+smart section pause threshold: 1.5s
 smart section max duration: 45s
 smart section max words: 90
 ```
@@ -233,6 +233,8 @@ transcripts/
 ```
 
 The app stores session metadata in `history.json`. Deleting a session from the app also removes its audio and transcript files.
+
+`history.json` stores metadata only. Transcript text is read from the `.txt` file when the app loads a session.
 
 ## Runtime Notes
 

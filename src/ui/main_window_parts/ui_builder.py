@@ -12,7 +12,6 @@ from PySide6.QtWidgets import (
     QProgressBar,
     QPushButton,
     QScrollArea,
-    QSlider,
     QSizePolicy,
     QStackedWidget,
     QTabWidget,
@@ -24,7 +23,7 @@ from PySide6.QtWidgets import (
 
 from src.resources import asset_path
 from src.ui.waveform import WaveformWidget
-from src.ui.widgets import Badge, HoverIconToolButton, NoWheelComboBox, NoWheelDoubleSpinBox, NoWheelSpinBox
+from src.ui.widgets import Badge, ClickableSlider, HoverIconToolButton, NoWheelComboBox, NoWheelDoubleSpinBox, NoWheelSpinBox
 
 
 class MainWindowUiBuilderMixin:
@@ -210,7 +209,7 @@ class MainWindowUiBuilderMixin:
         self.audio_play_button.setIconSize(QSize(16, 16))
         self.audio_play_button.setEnabled(False)
         self.audio_play_button.clicked.connect(self.toggle_audio_playback)
-        self.audio_position_slider = QSlider(Qt.Horizontal)
+        self.audio_position_slider = ClickableSlider(Qt.Horizontal)
         self.audio_position_slider.setObjectName("audioPositionSlider")
         self.audio_position_slider.setRange(0, 0)
         self.audio_position_slider.setEnabled(False)
@@ -459,4 +458,3 @@ class MainWindowUiBuilderMixin:
             button.set_named_icon(name)
         else:
             button.setIcon(QIcon(str(asset_path(name))))
-

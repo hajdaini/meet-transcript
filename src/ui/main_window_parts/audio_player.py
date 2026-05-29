@@ -117,3 +117,5 @@ class MainWindowAudioPlayerMixin:
     def stop_audio_player(self):
         if hasattr(self, "audio_player"):
             self.audio_player.stop()
+            self.audio_player.setSource(QUrl())
+            self.loaded_audio_session_id = None

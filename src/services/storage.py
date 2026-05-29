@@ -20,6 +20,7 @@ class StorageService:
         self.text_dir.mkdir(parents=True, exist_ok=True)
         if not self.history_path.exists():
             self.history_path.write_text("[]", encoding="utf-8")
+        self.migrate_history()
         if not self.settings_path.exists():
             self.save_settings(self.default_settings())
 
@@ -37,6 +38,7 @@ class StorageService:
         self.text_dir.mkdir(parents=True, exist_ok=True)
         if not self.history_path.exists():
             self.history_path.write_text("[]", encoding="utf-8")
+        self.migrate_history()
         if not self.settings_path.exists():
             self.save_settings(self.default_settings())
 
@@ -56,7 +58,7 @@ class StorageService:
         )
         items = self.load_raw()
         items.insert(0, self.to_dict(session))
-        self.history_path.write_text(json.dumps(items, indent=2, ensure_ascii=False), encoding="utf-8")
+        self.save_raw(items)
         return session
 
     def generate_session_title(self, transcript, language):
@@ -93,11 +95,17 @@ class StorageService:
                     duration_seconds=int(item["duration_seconds"]),
                     audio_path=Path(item["audio_path"]),
                     transcript_path=Path(item["transcript_path"]),
-                    transcript=item.get("transcript", ""),
+                    transcript=self.read_transcript(Path(item["transcript_path"])),
                     language=item.get("language", "auto"),
                 )
             )
         return sessions
+
+    def read_transcript(self, path):
+        try:
+            return path.read_text(encoding="utf-8")
+        except OSError:
+            return ""
 
     def load_raw(self):
         try:
@@ -106,7 +114,32 @@ class StorageService:
             return []
 
     def save_raw(self, items):
-        self.history_path.write_text(json.dumps(items, indent=2, ensure_ascii=False), encoding="utf-8")
+        cleaned = [self.strip_runtime_fields(item) for item in items]
+        self.history_path.write_text(json.dumps(cleaned, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    def migrate_history(self):
+        items = self.load_raw()
+        changed = False
+        for item in items:
+            transcript = item.get("transcript")
+            transcript_path = item.get("transcript_path")
+            if transcript and transcript_path:
+                path = Path(transcript_path)
+                if not path.exists():
+                    try:
+                        path.parent.mkdir(parents=True, exist_ok=True)
+                        path.write_text(transcript, encoding="utf-8")
+                    except OSError:
+                        pass
+            if "transcript" in item:
+                changed = True
+        if changed:
+            self.save_raw(items)
+
+    def strip_runtime_fields(self, item):
+        cleaned = dict(item)
+        cleaned.pop("transcript", None)
+        return cleaned
 
     def default_settings(self):
         return {
@@ -158,10 +191,34 @@ class StorageService:
                 kept.append(item)
         if not removed:
             return False
-        self.delete_file(Path(removed.get("audio_path", "")), self.audio_dir)
-        self.delete_file(Path(removed.get("transcript_path", "")), self.text_dir)
+        self.delete_session_files(removed)
         self.save_raw(kept)
         return True
+
+    def delete_session_files(self, item):
+        session_id = item.get("id", "")
+        self.delete_file(Path(item.get("audio_path", "")), self.audio_dir)
+        self.delete_file(Path(item.get("transcript_path", "")), self.text_dir)
+        if session_id:
+            self.delete_related_files(self.audio_dir, session_id)
+            self.delete_related_files(self.text_dir, session_id)
+
+    def delete_pending_audio(self, path):
+        if not path:
+            return
+        self.delete_file(Path(path), self.audio_dir)
+
+    def delete_related_files(self, directory, session_id):
+        try:
+            allowed = directory.resolve()
+            if not allowed.exists():
+                return
+            for path in allowed.glob(f"{session_id}.*"):
+                resolved = path.resolve()
+                if resolved.exists() and allowed in resolved.parents:
+                    resolved.unlink()
+        except OSError:
+            pass
 
     def delete_file(self, path, allowed_dir):
         try:
@@ -180,6 +237,5 @@ class StorageService:
             "duration_seconds": session.duration_seconds,
             "audio_path": str(session.audio_path),
             "transcript_path": str(session.transcript_path),
-            "transcript": session.transcript,
             "language": session.language,
         }

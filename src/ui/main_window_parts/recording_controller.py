@@ -149,6 +149,8 @@ class MainWindowRecordingMixin:
 
     def on_transcription_failed(self, message):
         self.transcription_running = False
+        if self.current_audio_path:
+            self.storage.delete_pending_audio(self.current_audio_path)
         self.status_label.setText(self.tr("transcription_error"))
         self.status_label.setProperty("state", "error")
         self.status_label.style().unpolish(self.status_label)
@@ -182,9 +184,9 @@ class MainWindowRecordingMixin:
         answer = QMessageBox.question(self, self.tr("close_title"), message, QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         if answer == QMessageBox.Yes:
             if self.recorder.running:
-                self.recorder.stop()
+                audio_path, _ = self.recorder.stop()
+                self.storage.delete_pending_audio(audio_path)
             self.stop_audio_player()
             event.accept()
         else:
             event.ignore()
-

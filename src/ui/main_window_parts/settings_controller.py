@@ -283,13 +283,25 @@ class MainWindowSettingsMixin:
             box.setIcon(QMessageBox.Information)
             box.setWindowTitle(self.tr("gpu_ready_title"))
             box.setText(self.tr("gpu_ready_text"))
-            box.setInformativeText(status.message)
+            box.setInformativeText(self.runtime_status_message(status))
             box.setStyleSheet("QMessageBox { background: #101216; } QLabel { color: #62f0c8; } QPushButton { background: #143f35; color: #ffffff; padding: 8px 14px; border-radius: 8px; }")
         else:
             box.setIcon(QMessageBox.Critical)
             box.setWindowTitle(self.tr("gpu_blocked_title"))
             box.setText(self.tr("gpu_blocked_text"))
-            box.setInformativeText(status.message)
+            box.setInformativeText(self.runtime_status_message(status))
             box.setStyleSheet("QMessageBox { background: #101216; } QLabel { color: #ffb4a8; } QPushButton { background: #4a1d1d; color: #ffffff; padding: 8px 14px; border-radius: 8px; }")
         box.exec()
 
+    def runtime_status_message(self, status):
+        missing = self.transcription.missing_gpu_dlls()
+        missing_text = ", ".join(missing)
+        if status.backend == "GPU":
+            return self.tr("gpu_ready_message", model=status.model)
+        if "bloque" in status.backend and not status.gpu_detected:
+            return self.tr("gpu_no_cuda_message")
+        if "bloque" in status.backend:
+            return self.tr("gpu_missing_dll_message", missing=missing_text)
+        if status.gpu_detected and missing:
+            return self.tr("gpu_cpu_fallback_message", missing=missing_text)
+        return self.tr("gpu_cpu_message")

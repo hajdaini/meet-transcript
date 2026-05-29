@@ -241,12 +241,12 @@ class MainWindowHistoryMixin:
             return
         answer = QMessageBox.question(self, self.tr("delete"), self.tr("delete_confirm", title=session.title))
         if answer == QMessageBox.Yes:
+            if getattr(self, "loaded_audio_session_id", None) == session.id:
+                self.stop_audio_player()
             self.storage.delete_session(session.id)
             self.load_history()
             self.transcript_preview.clear()
             self.copy_button.setEnabled(False)
             self.export_button.setEnabled(False)
             self.update_transcript_stats(None)
-            self.stop_audio_player()
             self.reset_audio_player_ui()
-
